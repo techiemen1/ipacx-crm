@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Checkbox } from "@/components/ui/checkbox"
 import { Badge } from "@/components/ui/badge"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
-import { MoreHorizontal, Trash2, Mail, DollarSign, Calendar } from "lucide-react"
+import { MoreHorizontal, Trash2, Mail, IndianRupee, Calendar } from "lucide-react"
 import { toast } from "sonner"
 import { deleteDeals } from "@/lib/crm-actions"
 import { ContactActions } from "@/components/admin/contact-actions"
@@ -108,8 +108,8 @@ export function CRMList({ deals }: CRMListProps) {
                                 <TableCell className="font-medium">{deal.title}</TableCell>
                                 <TableCell>
                                     <div className="flex items-center gap-1 text-sm">
-                                        <DollarSign className="w-3 h-3 text-muted-foreground" />
-                                        {deal.value.toLocaleString()}
+                                        <IndianRupee className="w-3 h-3 text-muted-foreground" />
+                                        {deal.value.toLocaleString('en-IN')}
                                     </div>
                                 </TableCell>
                                 <TableCell>

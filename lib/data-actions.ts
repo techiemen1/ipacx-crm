@@ -3,6 +3,7 @@
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import Papa from "papaparse"
+import * as XLSX from "xlsx"
 import { customerSchema } from "./schemas"
 import { z } from "zod"
 
@@ -12,11 +13,19 @@ export async function bulkImportLeads(formData: FormData) {
     const file = formData.get("file") as File
     if (!file) return { error: "No file provided" }
 
-    const text = await file.text()
-
     try {
-        const parsed = Papa.parse(text, { header: true, skipEmptyLines: true })
-        const rows = parsed.data as any[]
+        let rows: any[] = []
+
+        if (file.name.endsWith('.xlsx') || file.name.endsWith('.xls')) {
+            const buffer = await file.arrayBuffer()
+            const workbook = XLSX.read(buffer)
+            const sheetName = workbook.SheetNames[0]
+            rows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName])
+        } else {
+            const text = await file.text()
+            const parsed = Papa.parse(text, { header: true, skipEmptyLines: true })
+            rows = parsed.data as any[]
+        }
 
         if (rows.length === 0) return { error: "No data found in CSV" }
 
@@ -26,40 +35,47 @@ export async function bulkImportLeads(formData: FormData) {
         let errorCount = 0
 
         for (const row of rows) {
-            // Map commonly used CSV headers to our schema keys
-            const leadData = {
-                name: row.name || row.Name || row["First Name"],
-                email: row.email || row.Email || `no-email-${Date.now()}-${Math.random()}@placeholder.com`, // Fallback if allowed? No, schema req email
-                phone: row.phone || row.Phone || row["Mobile"] || row["Cell"],
-                projectInterest: row.projectInterest || row.property || row["Project Interest"],
-                status: row.status || "Lead",
-                address: row.address || row.Address || row.Location,
+            // Normalize row keys to handle case sensitivity and whitespace
+            const normalizedRow: Record<string, any> = {};
+            Object.keys(row).forEach(key => {
+                const cleanKey = key.toLowerCase().trim().replace(/[^a-z0-9]/g, "");
+                if (cleanKey) normalizedRow[cleanKey] = row[key];
+            });
+
+            // Map commonly used CSV headers to our schema keys using normalized lookup
+            // Priorities: name > fullname > firstname > customername
+            const leadData: any = {
+                name: normalizedRow["name"] || normalizedRow["fullname"] || normalizedRow["firstname"] || normalizedRow["customername"] || normalizedRow["clientname"],
+                email: normalizedRow["email"] || normalizedRow["mailid"] || normalizedRow["e_mail"] || `no-email-${Date.now()}-${Math.random()}@placeholder.com`,
+                phone: normalizedRow["phone"] || normalizedRow["phoneno"] || normalizedRow["mobile"] || normalizedRow["mobileno"] || normalizedRow["cell"] || normalizedRow["contact"] || normalizedRow["contactno"],
+                projectInterest: normalizedRow["projectinterest"] || normalizedRow["property"] || normalizedRow["project"] || normalizedRow["interestedin"],
+                status: normalizedRow["status"] || "Lead",
+                address: normalizedRow["address"] || normalizedRow["location"] || normalizedRow["city"] || normalizedRow["residence"]
+            };
+
+            // Clean phone number: keep only digits and +
+            if (leadData.phone) {
+                leadData.phone = String(leadData.phone).replace(/[^0-9+]/g, "");
             }
 
-            // Clean phone
-            if (leadData.phone) leadData.phone = String(leadData.phone).replace(/[^0-9+]/g, "")
-
             // Validate
-            // We use a partial schema because CSV might be missing some optional fields
-            const parseResult = customerSchema.safeParse(leadData)
+            const parseResult = customerSchema.safeParse(leadData);
 
             if (parseResult.success) {
                 try {
-                    // Start transaction for each or batch? Batch is faster but one fail kills all. 
-                    // Let's do individual for partial success report.
                     await prisma.customer.upsert({
                         where: { email: parseResult.data.email },
                         update: { ...parseResult.data }, // Update if exists
-                        create: { ...parseResult.data, status: "Lead" }
-                    })
-                    successCount++
+                        create: { ...parseResult.data, status: parseResult.data.status || "Lead" }
+                    });
+                    successCount++;
                 } catch (e) {
-                    console.error("Row import error", e)
-                    errorCount++
+                    console.error("Row import error", e);
+                    errorCount++;
                 }
             } else {
-                console.log("Validation error", parseResult.error)
-                errorCount++
+                console.log("Validation error for row:", { name: leadData.name, phone: leadData.phone }, parseResult.error);
+                errorCount++;
             }
         }
 

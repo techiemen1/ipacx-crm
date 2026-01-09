@@ -116,16 +116,16 @@ export function DataManagement() {
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid w-full max-w-sm items-center gap-1.5">
-                                <Label htmlFor="leads-csv">CSV File</Label>
+                                <Label htmlFor="leads-csv">File (CSV or Excel)</Label>
                                 <Input
                                     id="leads-csv"
                                     type="file"
-                                    accept=".csv"
+                                    accept=".csv, .xlsx, .xls"
                                     onChange={(e) => setLeadFile(e.target.files?.[0] || null)}
                                 />
                             </div>
                             <div className="bg-slate-50 p-4 rounded-md text-sm text-slate-600">
-                                <p className="font-medium mb-2">CSV Format Example:</p>
+                                <p className="font-medium mb-2">Format Example (CSV/Excel):</p>
                                 <code className="block bg-white p-2 border rounded text-xs overflow-x-auto">
                                     Name,Email,Phone,Project Interest,Status<br />
                                     John Doe,john@example.com,9876543210,Villa Project,Lead

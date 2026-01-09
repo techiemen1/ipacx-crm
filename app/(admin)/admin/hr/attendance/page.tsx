@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button"
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from "lucide-react"
 import Link from "next/link"
 
-export default async function Page({ searchParams }: { searchParams: { date?: string } }) {
+export default async function Page({ searchParams }: { searchParams: Promise<{ date?: string }> }) {
+    const params = await searchParams
     const today = new Date()
-    const dateParam = searchParams.date ? new Date(searchParams.date) : today
+    const dateParam = params.date ? new Date(params.date) : today
     const dateStr = dateParam.toISOString().split('T')[0]
 
     const employees = await getAttendanceSheet(dateParam)

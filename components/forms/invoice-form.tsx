@@ -423,25 +423,48 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
                                             </datalist>
                                         </td>
                                         <td className="p-2">
-                                            <Input
-                                                type="number"
-                                                {...form.register(`invoiceItems.${index}.quantity`)}
-                                                onChange={(e) => {
-                                                    form.setValue(`invoiceItems.${index}.quantity`, parseFloat(e.target.value))
-                                                    recalculateTaxForRow(index)
-                                                }}
-                                                className="border-0 focus-visible:ring-0 text-right px-2"
+                                            <FormField
+                                                control={form.control}
+                                                name={`invoiceItems.${index}.quantity`}
+                                                render={({ field }) => (
+                                                    <FormItem className="space-y-0">
+                                                        <FormControl>
+                                                            <Input
+                                                                type="number"
+                                                                {...field}
+                                                                onChange={(e) => {
+                                                                    const val = parseFloat(e.target.value)
+                                                                    field.onChange(val)
+                                                                    // We pass the updated value to recalculate immediately
+                                                                    recalculateTaxForRow(index)
+                                                                }}
+                                                                className="border-0 focus-visible:ring-0 text-right px-2"
+                                                            />
+                                                        </FormControl>
+                                                    </FormItem>
+                                                )}
                                             />
                                         </td>
                                         <td className="p-2">
-                                            <Input
-                                                type="number"
-                                                {...form.register(`invoiceItems.${index}.rate`)}
-                                                onChange={(e) => {
-                                                    form.setValue(`invoiceItems.${index}.rate`, parseFloat(e.target.value))
-                                                    recalculateTaxForRow(index)
-                                                }}
-                                                className="border-0 focus-visible:ring-0 text-right px-2"
+                                            <FormField
+                                                control={form.control}
+                                                name={`invoiceItems.${index}.rate`}
+                                                render={({ field }) => (
+                                                    <FormItem className="space-y-0">
+                                                        <FormControl>
+                                                            <Input
+                                                                type="number"
+                                                                {...field}
+                                                                onChange={(e) => {
+                                                                    const val = parseFloat(e.target.value)
+                                                                    field.onChange(val)
+                                                                    recalculateTaxForRow(index)
+                                                                }}
+                                                                className="border-0 focus-visible:ring-0 text-right px-2"
+                                                            />
+                                                        </FormControl>
+                                                    </FormItem>
+                                                )}
                                             />
                                         </td>
                                         <td className="p-2">

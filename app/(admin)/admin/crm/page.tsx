@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { CRMView } from "@/components/admin/crm/crm-view"
 import { DealDialog } from "@/components/admin/crm/deal-dialog"
+import { CustomerDialog } from "@/components/admin/crm/customer-dialog"
 import { getDeals, getPipelines } from "@/lib/crm-actions"
 
 export default async function CRMPage() {
@@ -19,12 +20,15 @@ export default async function CRMPage() {
                     <h1 className="text-3xl font-bold tracking-tight">Sales Pipeline</h1>
                     <p className="text-muted-foreground">{activePipeline?.name || "Manage your deals"}</p>
                 </div>
-                {activePipeline && (
-                    <DealDialog
-                        customers={customers}
-                        stages={activePipeline.stages}
-                    />
-                )}
+                <div className="flex items-center gap-2">
+                    <CustomerDialog />
+                    {activePipeline && (
+                        <DealDialog
+                            customers={customers}
+                            stages={activePipeline.stages}
+                        />
+                    )}
+                </div>
             </div>
 
             {activePipeline ? (

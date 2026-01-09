@@ -82,17 +82,17 @@ export function DealDialog({ customers, stages, trigger, defaultCustomerId, open
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                {trigger || <Button><Plus className="mr-2 h-4 w-4" /> Add Deal</Button>}
+                {trigger || <Button><Plus className="mr-2 h-4 w-4" /> Add Lead</Button>}
             </DialogTrigger>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>New Deal</DialogTitle>
+                    <DialogTitle>New Lead</DialogTitle>
                 </DialogHeader>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                         <FormField control={form.control} name="title" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Deal Title</FormLabel>
+                                <FormLabel>Lead Title</FormLabel>
                                 <FormControl><Input placeholder="e.g. Bulk Order for X" {...field} /></FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -147,7 +147,7 @@ export function DealDialog({ customers, stages, trigger, defaultCustomerId, open
 
                         <Button type="submit" className="w-full" disabled={loading}>
                             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Create Deal
+                            Create Lead
                         </Button>
                     </form>
                 </Form>

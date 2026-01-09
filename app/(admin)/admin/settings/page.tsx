@@ -58,7 +58,7 @@ export default async function SettingsPage() {
             </div>
 
             <Tabs defaultValue="profile" className="w-full">
-                <TabsList className="grid w-full grid-cols-4 lg:w-[800px]">
+                <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 lg:grid-cols-6 h-auto">
                     <TabsTrigger value="profile">My Profile</TabsTrigger>
                     <TabsTrigger value="organization">Organization</TabsTrigger>
                     <TabsTrigger value="data">Data Management</TabsTrigger>

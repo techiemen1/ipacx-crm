@@ -16,7 +16,15 @@ export function CommunicationSettings() {
 
     return (
         <div className="space-y-6">
+            <div className="flex items-center justify-between">
+                <div>
+                    <h3 className="text-lg font-medium">Communication Channels</h3>
+                    <p className="text-sm text-slate-500">Configure Email, SMS, and WhatsApp integrations.</p>
+                </div>
+            </div>
+
             <div className="grid gap-6 md:grid-cols-2">
+
                 {/* Email Settings */}
                 <Card>
                     <CardHeader>

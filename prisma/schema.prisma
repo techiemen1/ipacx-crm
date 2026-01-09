@@ -30,6 +30,7 @@ model User {
   employee  Employee?
   roles     UserRole[]
   deals     CRMDeal[]
+  internalLogs InternalLog[]
 }
 
 model UserProfile {
@@ -1038,4 +1039,15 @@ model CommunicationLog {
   status        String   @default("Sent") // Sent, Draft, Failed
   sentBy        String?  // UserId
   sentAt        DateTime @default(now())
+}
+
+model InternalLog {
+  id          String   @id @default(cuid())
+  action      String
+  module      String
+  description String
+  userId      String?
+  timestamp   DateTime @default(now())
+
+  user        User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
 }

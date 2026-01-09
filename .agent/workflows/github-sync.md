@@ -6,30 +6,40 @@ description: Sync project with GitHub (Commit & Push)
 
 This workflow will stage all changes, commit them with a message, and push to the remote repository.
 
+## Prerequisites
+1.  **Create Repository**: Log in to GitHub and create a new repository/project named `oviyam-reporting`. Do not initialize with README/gitignore.
+2.  **Ensure SSH Access**: Run `ssh -T git@github.com` to verify.
+
 ## 1. Check Git Status
 View current changes.
 ```bash
 git status
 ```
 
-## 2. Add All Changes
+## 2. Add Remote (One Time)
+If you haven't linked the project yet:
+```bash
+// turbo
+git remote add origin git@github.com:techiemen1/ipacx-crm.git
+```
+
+## 3. Add All Changes
 Stage all modified and new files.
 ```bash
 // turbo
 git add .
 ```
 
-## 3. Commit Changes
-Commit with a descriptive message. Replace "Update" with a specific message if running manually.
+## 4. Commit Changes
+Commit with a descriptive message.
 ```bash
 git commit -m "Update: Enhance Admin/CRM features and documentation"
 ```
 
-## 4. Push to Remote
+## 5. Push to Remote
 Push changes to the `origin` remote on branch `main`.
-*Note: Ensure SSH keys are configured for techiemen1@gmail.com*
 ```bash
-git push origin main
+git push -u origin main
 ```
 
 ## 5. Troubleshooting

@@ -10,6 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { hasPermission, getRedirectPath } from "@/lib/rbac"
 import { redirect } from "next/navigation"
 import { CommunicationSettings } from "@/components/settings/communication-settings"
+import { ActivityLogs } from "@/components/settings/activity-logs"
 
 export default async function SettingsPage() {
     const session = await auth()
@@ -63,6 +64,7 @@ export default async function SettingsPage() {
                     <TabsTrigger value="data">Data Management</TabsTrigger>
                     <TabsTrigger value="hr">HR & Payroll</TabsTrigger>
                     <TabsTrigger value="communication">Communication</TabsTrigger>
+                    {role === "ADMIN" && <TabsTrigger value="logs">Activity Logs</TabsTrigger>}
                 </TabsList>
 
                 <TabsContent value="profile" className="space-y-6 mt-6">
@@ -123,6 +125,12 @@ export default async function SettingsPage() {
                 <TabsContent value="communication" className="space-y-6 mt-6">
                     <CommunicationSettings />
                 </TabsContent>
+
+                {role === "ADMIN" && (
+                    <TabsContent value="logs" className="space-y-6 mt-6">
+                        <ActivityLogs />
+                    </TabsContent>
+                )}
             </Tabs>
         </div>
     )

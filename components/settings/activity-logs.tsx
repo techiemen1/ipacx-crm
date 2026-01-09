@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Trash2, ShieldAlert, Clock, RefreshCw, Download } from "lucide-react"
 import { toast } from "sonner"
-import { getLogs, deleteOldLogs } from "@/lib/log-actions"
+import { getLogs, deleteOldLogs, deleteLogs, getAllLogsForExport } from "@/lib/log-actions"
+import { Checkbox } from "@/components/ui/checkbox"
 
 interface Log {
     id: string
@@ -22,16 +23,18 @@ export function ActivityLogs() {
     const [logs, setLogs] = useState<Log[]>([])
     const [loading, setLoading] = useState(true)
     const [deleting, setDeleting] = useState(false)
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
 
     const fetchLogs = useCallback(async () => {
         setLoading(true)
-        const res = await getLogs(50) // Fetch last 50
+        const res = await getLogs(50)
         if (res.success && res.data) {
             setLogs(res.data)
         } else {
             toast.error("Failed to load audit logs")
         }
         setLoading(false)
+        setSelectedIds(new Set())
     }, [])
 
     useEffect(() => {
@@ -51,19 +54,47 @@ export function ActivityLogs() {
         setDeleting(false)
     }
 
+    async function handleBulkDelete() {
+        if (!confirm(`Using Admin Privilege: Delete ${selectedIds.size} logs?`)) return
+        setDeleting(true)
+        const res = await deleteLogs(Array.from(selectedIds))
+        if (res.success) {
+            toast.success("Selected logs deleted")
+            fetchLogs()
+        } else {
+            toast.error(res.error || "Failed to delete logs")
+        }
+        setDeleting(false)
+    }
+
     async function handleExport() {
-        if (logs.length === 0) return toast.error("No logs to export")
+        let exportData = logs
+
+        // If nothing selected, fetch ALL from server
+        if (selectedIds.size === 0) {
+            toast.info("Fetching full log history...")
+            const res = await getAllLogsForExport()
+            if (res.success && res.data) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                exportData = res.data as any
+            } else {
+                return toast.error("Failed to fetch full history")
+            }
+        } else {
+            // Export only selected
+            exportData = logs.filter(l => selectedIds.has(l.id))
+        }
 
         const headers = ["Timestamp", "User Name", "User Email", "Module", "Action", "Description"]
         const csvContent = [
             headers.join(","),
-            ...logs.map(log => [
+            ...exportData.map(log => [
                 new Date(log.timestamp).toISOString(),
                 `"${log.user?.name || 'System'}"`,
                 `"${log.user?.email || ''}"`,
                 `"${log.module}"`,
                 `"${log.action}"`,
-                `"${log.description.replace(/"/g, '""')}"` // Escape quotes
+                `"${log.description.replace(/"/g, '""')}"`
             ].join(","))
         ].join("\n")
 
@@ -71,10 +102,25 @@ export function ActivityLogs() {
         const url = URL.createObjectURL(blob)
         const link = document.createElement("a")
         link.href = url
-        link.setAttribute("download", `activity_logs_${new Date().toISOString().slice(0, 10)}.csv`)
+        link.setAttribute("download", `activity_logs_${selectedIds.size > 0 ? 'selected' : 'FULL'}_${new Date().toISOString().slice(0, 10)}.csv`)
         document.body.appendChild(link)
         link.click()
         document.body.removeChild(link)
+    }
+
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            setSelectedIds(new Set(logs.map(l => l.id)))
+        } else {
+            setSelectedIds(new Set())
+        }
+    }
+
+    const handleSelectRow = (id: string, checked: boolean) => {
+        const next = new Set(selectedIds)
+        if (checked) next.add(id)
+        else next.delete(id)
+        setSelectedIds(next)
     }
 
     return (
@@ -85,15 +131,22 @@ export function ActivityLogs() {
                     <p className="text-sm text-slate-500">Audit trail of actions performed by users.</p>
                 </div>
                 <div className="flex gap-2">
+                    {selectedIds.size > 0 && (
+                        <Button variant="destructive" size="sm" onClick={handleBulkDelete} disabled={deleting}>
+                            <Trash2 className="h-4 w-4 mr-2" /> Delete ({selectedIds.size})
+                        </Button>
+                    )}
                     <Button variant="outline" size="sm" onClick={handleExport}>
-                        <Download className="h-4 w-4 mr-2" /> Export CSV
+                        <Download className="h-4 w-4 mr-2" /> {selectedIds.size > 0 ? `Export (${selectedIds.size})` : "Export All"}
                     </Button>
                     <Button variant="outline" size="sm" onClick={fetchLogs}>
                         <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
                     </Button>
-                    <Button variant="destructive" size="sm" onClick={handleCleanup} disabled={deleting}>
-                        <Trash2 className="h-4 w-4 mr-2" /> Clear Old Logs
-                    </Button>
+                    {selectedIds.size === 0 && (
+                        <Button variant="destructive" size="sm" onClick={handleCleanup} disabled={deleting}>
+                            <Trash2 className="h-4 w-4 mr-2" /> Clear Old Logs
+                        </Button>
+                    )}
                 </div>
             </div>
 
@@ -101,6 +154,12 @@ export function ActivityLogs() {
                 <Table>
                     <TableHeader className="bg-slate-50">
                         <TableRow>
+                            <TableHead className="w-[50px]">
+                                <Checkbox
+                                    checked={logs.length > 0 && selectedIds.size === logs.length}
+                                    onCheckedChange={handleSelectAll}
+                                />
+                            </TableHead>
                             <TableHead>Time</TableHead>
                             <TableHead>User</TableHead>
                             <TableHead>Module</TableHead>
@@ -111,13 +170,13 @@ export function ActivityLogs() {
                     <TableBody>
                         {loading ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                                <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                                     Loading activity logs...
                                 </TableCell>
                             </TableRow>
                         ) : logs.length === 0 ? (
                             <TableRow>
-                                <TableCell colSpan={5} className="text-center py-8 text-slate-500">
+                                <TableCell colSpan={6} className="text-center py-8 text-slate-500">
                                     <div className="flex flex-col items-center gap-2">
                                         <ShieldAlert className="h-8 w-8 text-slate-300" />
                                         <p>No activity recorded yet.</p>
@@ -127,6 +186,12 @@ export function ActivityLogs() {
                         ) : (
                             logs.map((log) => (
                                 <TableRow key={log.id}>
+                                    <TableCell>
+                                        <Checkbox
+                                            checked={selectedIds.has(log.id)}
+                                            onCheckedChange={(c) => handleSelectRow(log.id, !!c)}
+                                        />
+                                    </TableCell>
                                     <TableCell className="text-xs text-slate-500 whitespace-nowrap">
                                         <div className="flex items-center gap-1">
                                             <Clock className="h-3 w-3" />
@@ -152,7 +217,7 @@ export function ActivityLogs() {
                     </TableBody>
                 </Table>
             </div>
-            <p className="text-xs text-center text-slate-400">Showing last 50 records.</p>
+            <p className="text-xs text-center text-slate-400">Showing last 50 records. Use "Export All" to download full history.</p>
         </div>
     )
 }

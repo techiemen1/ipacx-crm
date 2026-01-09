@@ -65,3 +65,36 @@ export async function deleteOldLogs(days: number) {
         return { error: "Failed to delete logs" }
     }
 }
+
+export async function deleteLogs(ids: string[]) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const session = await auth()
+    if ((session?.user as any).role !== "ADMIN") return { error: "Unauthorized" }
+
+    try {
+        await prisma.internalLog.deleteMany({
+            where: { id: { in: ids } }
+        })
+        await logAction("DELETE_LOGS", "SYSTEM", `Deleted ${ids.length} selected logs`)
+        revalidatePath("/admin/settings")
+        return { success: true }
+    } catch (error) {
+        return { error: "Failed to delete selected logs" }
+    }
+}
+
+export async function getAllLogsForExport() {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const session = await auth()
+    if ((session?.user as any).role !== "ADMIN") return { error: "Unauthorized" }
+
+    try {
+        const logs = await prisma.internalLog.findMany({
+            orderBy: { timestamp: "desc" },
+            include: { user: { select: { name: true, email: true } } }
+        })
+        return { success: true, data: logs }
+    } catch (error) {
+        return { error: "Failed to fetch all logs" }
+    }
+}

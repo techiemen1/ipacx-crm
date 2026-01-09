@@ -5,7 +5,24 @@
 - **ORM**: Prisma (Object-Relational Mapping)
 - **Location**: `prisma/dev.db` (SQLite file)
 
-## 2. Schema Overview
+## 2. Choosing Your Edition (Dual Mode)
+This project supports two database modes. You can switch between them using our utility script.
+
+### Lite Version (Default)
+- **Engine**: SQLite
+- **Best for**: Small setups, testing, single-server deployments.
+- **Switch**: `node scripts/switch-db.js sqlite`
+
+### Enterprise Version
+- **Engine**: PostgreSQL
+- **Best for**: Scalability, high concurrency, cloud deployments.
+- **Prerequisite**: Docker installed.
+- **Setup**:
+  1. `docker-compose up -d` (Starts Postgres)
+  2. `node scripts/switch-db.js postgres` (Configures App)
+  3. `npx prisma db push` (Syncs Schema)
+
+## 3. Schema Overview
 
 ### 2.1 Core Modules
 - **User Management**: `User` (Auth), `UserProfile` (Details), `Role` (Permissions)

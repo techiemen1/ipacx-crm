@@ -113,9 +113,9 @@ export function InvoiceView({ invoice, companyProfile }: InvoiceViewProps) {
                                 </div>
                                 <div className="col-span-1 text-center text-slate-600">{item.taxRate}%</div>
                                 <div className="col-span-1 text-center text-slate-600">{item.quantity}</div>
-                                <div className="col-span-2 text-right text-slate-600">{(companyProfile?.currency || '₹')}{item.rate.toLocaleString()}</div>
-                                <div className="col-span-2 text-right text-slate-600">{(companyProfile?.currency || '₹')}{taxAmt.toLocaleString()}</div>
-                                <div className="col-span-2 text-right pr-2 font-semibold">{(companyProfile?.currency || '₹')}{total.toLocaleString()}</div>
+                                <div className="col-span-2 text-right text-slate-600">₹{item.rate.toLocaleString('en-IN')}</div>
+                                <div className="col-span-2 text-right text-slate-600">₹{taxAmt.toLocaleString('en-IN')}</div>
+                                <div className="col-span-2 text-right pr-2 font-semibold">₹{total.toLocaleString('en-IN')}</div>
                             </div>
                         )
                     })}
@@ -154,15 +154,15 @@ export function InvoiceView({ invoice, companyProfile }: InvoiceViewProps) {
                     <div className="space-y-3 pt-2">
                         <div className="flex justify-between text-sm">
                             <span className="font-medium text-slate-600">Sub Total</span>
-                            <span className="font-bold text-slate-800">{(companyProfile?.currency || '₹')}{invoice.amount.toLocaleString()}</span>
+                            <span className="font-bold text-slate-800">₹{invoice.amount.toLocaleString('en-IN')}</span>
                         </div>
                         <div className="flex justify-between text-sm">
                             <span className="font-medium text-slate-600">Total Tax (GST)</span>
-                            <span className="font-bold text-slate-800">{(companyProfile?.currency || '₹')}{invoice.taxAmount.toLocaleString()}</span>
+                            <span className="font-bold text-slate-800">₹{invoice.taxAmount.toLocaleString('en-IN')}</span>
                         </div>
                         <div className="flex justify-between text-xl border-t border-slate-300 pt-3">
-                            <span className="font-bold text-slate-800">Total ({companyProfile?.currency || 'INR'})</span>
-                            <span className="font-bold text-slate-900">{(companyProfile?.currency || '₹')}{invoice.totalAmount.toLocaleString()}</span>
+                            <span className="font-bold text-slate-800">Total (INR)</span>
+                            <span className="font-bold text-slate-900">₹{invoice.totalAmount.toLocaleString('en-IN')}</span>
                         </div>
                     </div>
                 </div>

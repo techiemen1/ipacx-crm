@@ -22,12 +22,17 @@ import { MoreHorizontal } from "lucide-react"
 import Link from "next/link"
 import { useState } from "react"
 import { RecordPaymentModal } from "./record-payment-modal"
+import { deleteInvoice } from "@/lib/actions"
+import { toast } from "sonner"
+import { useRouter } from "next/navigation"
 
 interface InvoiceListProps {
     initialInvoices: any[]
 }
 
 export function InvoiceList({ initialInvoices }: InvoiceListProps) {
+    const router = useRouter()
+
     if (initialInvoices.length === 0) {
         return <div className="text-muted-foreground text-sm py-4">No invoices found.</div>
     }
@@ -38,6 +43,17 @@ export function InvoiceList({ initialInvoices }: InvoiceListProps) {
     const handleRecordPayment = (invoice: any) => {
         setSelectedInvoice(invoice)
         setPaymentModalOpen(true)
+    }
+
+    const handleDelete = async (id: string) => {
+        if (!confirm("Are you sure you want to delete this invoice?")) return
+        const res = await deleteInvoice(id)
+        if (res?.error) {
+            toast.error(res.error)
+        } else {
+            toast.success("Invoice deleted successfully")
+            router.refresh()
+        }
     }
 
     return (
@@ -72,7 +88,7 @@ export function InvoiceList({ initialInvoices }: InvoiceListProps) {
                                 </Badge>
                             </TableCell>
                             <TableCell className="text-right font-bold">
-                                ₹{invoice.totalAmount ? invoice.totalAmount.toLocaleString() : invoice.amount.toLocaleString()}
+                                ₹{invoice.totalAmount ? invoice.totalAmount.toLocaleString('en-IN') : invoice.amount.toLocaleString('en-IN')}
                             </TableCell>
                             <TableCell className="text-right">
                                 <DropdownMenu>
@@ -97,7 +113,12 @@ export function InvoiceList({ initialInvoices }: InvoiceListProps) {
                                         <DropdownMenuItem onClick={() => handleRecordPayment(invoice)}>
                                             Record Payment
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
+                                        <DropdownMenuItem
+                                            className="text-red-600 focus:text-red-600"
+                                            onClick={() => handleDelete(invoice.id)}
+                                        >
+                                            Delete
+                                        </DropdownMenuItem>
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </TableCell>

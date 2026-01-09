@@ -1,6 +1,6 @@
 "use server"
 
-import { signIn, signOut } from "@/auth"
+import { signIn, signOut, auth } from "@/auth"
 import { AuthError } from "next-auth"
 import { prisma } from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
@@ -207,32 +207,31 @@ export async function deleteCustomer(id: string) {
 export async function createInvoice(data: unknown) {
     const validated = invoiceSchema.safeParse(data)
     if (!validated.success) return { error: "Invalid data" }
-    const { invoiceNo, customerId, amount, taxRate, dueDate, status, invoiceItems, type, notes, terms } = validated.data
+    const { invoiceNo, customerId, dueDate, status, invoiceItems, type, notes, terms } = validated.data
 
-    const taxAmount = (amount * (taxRate || 0)) / 100
-    const totalAmount = amount + taxAmount
+    // Calculate totals from items
+    const subtotal = invoiceItems?.reduce((sum, item) => sum + (item.quantity * item.rate), 0) || 0
+    const taxTotal = invoiceItems?.reduce((sum, item) => sum + (item.cgstAmount || 0) + (item.sgstAmount || 0) + (item.igstAmount || 0) + (item.cessAmount || 0), 0) || 0
+    const totalAmount = subtotal + taxTotal - (validated.data.tdsAmount || 0)
 
     try {
         await prisma.invoice.create({
             data: {
                 invoiceNo,
                 customerId,
-                amount,
-                taxRate: taxRate || 0,
-                taxAmount,
+                amount: subtotal, // Save subtotal as amount
+                taxRate: 0, // Legacy field, effectively unused for item-level tax
+                taxAmount: taxTotal,
                 totalAmount,
                 dueDate: new Date(dueDate),
                 status,
                 paymentStatus: status === 'Paid' ? 'Paid' : 'Unpaid',
                 type,
-                // items: items || "[]", // Deprecated
                 invoiceItems: {
                     create: invoiceItems || []
                 },
                 notes,
                 terms,
-                // New Statutory Fields
-                // New Statutory Fields
                 placeOfSupply: validated.data.placeOfSupply,
                 gstin: validated.data.gstin,
                 tdsAmount: validated.data.tdsAmount,
@@ -378,28 +377,29 @@ export async function recordPayment(data: unknown) {
 export async function updateInvoice(id: string, data: unknown) {
     const validated = invoiceSchema.safeParse(data)
     if (!validated.success) return { error: "Invalid data" }
-    const { invoiceNo, customerId, amount, taxRate, dueDate, status, invoiceItems, type, notes, terms } = validated.data
+    const { invoiceNo, customerId, dueDate, status, invoiceItems, type, notes, terms } = validated.data
 
-    const taxAmount = (amount * (taxRate || 0)) / 100
-    const totalAmount = amount + taxAmount
+    // Calculate totals from items
+    const subtotal = invoiceItems?.reduce((sum, item) => sum + (item.quantity * item.rate), 0) || 0
+    const taxTotal = invoiceItems?.reduce((sum, item) => sum + (item.cgstAmount || 0) + (item.sgstAmount || 0) + (item.igstAmount || 0) + (item.cessAmount || 0), 0) || 0
+    const totalAmount = subtotal + taxTotal - (validated.data.tdsAmount || 0)
 
     try {
-        // Transaction to update invoice and replace items
         await prisma.$transaction(async (tx) => {
             // 1. Delete existing items
             await tx.invoiceItem.deleteMany({
                 where: { invoiceId: id }
             })
 
-            // 2. Update invoice with new items
+            // 2. Update invoice with new items and recalculated totals
             await tx.invoice.update({
                 where: { id },
                 data: {
                     invoiceNo,
                     customerId,
-                    amount,
-                    taxRate: taxRate || 0,
-                    taxAmount,
+                    amount: subtotal,
+                    taxRate: 0,
+                    taxAmount: taxTotal,
                     totalAmount,
                     dueDate: new Date(dueDate),
                     status,
@@ -410,8 +410,6 @@ export async function updateInvoice(id: string, data: unknown) {
                     },
                     notes,
                     terms,
-                    // New Statutory Fields
-                    // New Statutory Fields
                     placeOfSupply: validated.data.placeOfSupply,
                     gstin: validated.data.gstin,
                     tdsAmount: validated.data.tdsAmount,
@@ -591,4 +589,45 @@ export async function deleteCompany(id: string) {
 
 export async function logoutAction() {
     await signOut({ redirectTo: "/login" })
+}
+
+// --- Danger Zone ---
+
+export async function resetApplicationData() {
+    // Check if user is admin - simplified check, assuming this action is only called by authorized users
+    // Ideally we should check session role here
+    const session = await auth()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((session?.user as any)?.role !== "ADMIN") return { error: "Unauthorized" }
+
+    try {
+        await prisma.$transaction([
+            // Delete transactional data in order of dependencies
+            prisma.payment.deleteMany(),
+            prisma.invoiceItem.deleteMany(),
+            prisma.invoice.deleteMany(),
+            prisma.expense.deleteMany(),
+            prisma.cRMDeal.deleteMany(),
+            prisma.activity.deleteMany(),
+            prisma.attendance.deleteMany(),
+            prisma.payslip.deleteMany(),
+
+            // Delete secondary entities
+            prisma.project.deleteMany(),
+            prisma.property.deleteMany(),
+            prisma.inventoryItem.deleteMany(),
+            prisma.vendor.deleteMany(), // If vendors are linked to expenses
+
+            // Create/Delete logic for Customers?
+            // Usually "Reset Data" implies clearing business data but maybe keeping settings
+            // Let's clear Customers too as they are "Data"
+            prisma.customer.deleteMany(),
+        ])
+
+        revalidatePath("/", "layout")
+        return { success: true }
+    } catch (e) {
+        console.error(e)
+        return { error: "Failed to reset data" }
+    }
 }

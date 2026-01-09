@@ -197,6 +197,36 @@ export function DataManagement() {
                                 </Button>
                             </CardContent>
                         </Card>
+                        {/* Reset Data Section */}
+                        <Card className="border-red-200">
+                            <CardHeader>
+                                <CardTitle className="text-red-600">Danger Zone</CardTitle>
+                                <CardDescription>Reset the application by deleting all business data.</CardDescription>
+                            </CardHeader>
+                            <CardContent className="space-y-4">
+                                <div className="p-4 bg-red-50 text-red-800 rounded-md text-sm flex items-start gap-2">
+                                    <AlertCircle className="h-5 w-5 shrink-0" />
+                                    <p>Caution: This will permanently delete customers, invoices, expenses, projects, and leads. Users and HR settings will be preserved.</p>
+                                </div>
+                                <Button
+                                    onClick={async () => {
+                                        if (!confirm("CRITICAL WARNING: This will ERASE ALL DATA. Are you 100% sure?")) return
+                                        if (!confirm("This action cannot be undone. Confirm again: DELETE ALL DATA?")) return
+
+                                        const res = await import("@/lib/actions").then(m => m.resetApplicationData())
+                                        if (res.error) toast.error(res.error)
+                                        else {
+                                            toast.success("Application data reset successfully")
+                                            window.location.reload()
+                                        }
+                                    }}
+                                    variant="destructive"
+                                    className="w-full"
+                                >
+                                    Reset Application Data
+                                </Button>
+                            </CardContent>
+                        </Card>
                     </div>
                 </TabsContent>
             </Tabs>

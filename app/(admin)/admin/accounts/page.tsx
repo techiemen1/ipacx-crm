@@ -55,7 +55,6 @@ export default async function AccountsPage() {
                     <p className="text-xs text-muted-foreground">This Month</p>
                 </Link>
 
-// ... (skipping unchanged lines)
 
                 <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
                     <div className="flex flex-row items-center justify-between space-y-0 pb-2">

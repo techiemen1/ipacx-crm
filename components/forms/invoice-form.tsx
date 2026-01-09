@@ -113,79 +113,25 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
     }, [watchedCustomerId, customers, form])
 
     // Calculate Taxes
-    const items = form.watch("invoiceItems")
     const placeOfSupply = form.watch("placeOfSupply")
     const companyProfileId = form.watch("companyProfileId")
 
-    useEffect(() => {
-        const company = companyProfiles.find(c => c.id === companyProfileId)
-        // Assume company state from its GSTIN if available, or address? 
-        // For simplicity, let's assume Company GSTIN is available or we need to parse it. 
-        // If company has no GSTIN, we default to Intra-State logic or assume Karnataka (based on logs).
-        // Let's try to get company state.
+    // Optimization: Removed the dangerous 'items' watcher useEffect
+    // We rely on explicit recalculation in onChange handlers and the specific effects below.
 
-        let companyState = ""
-        if (company?.gstin) {
-            companyState = getStateFromGstin(company.gstin) || ""
-        }
-        // Fallback: Default to Karnataka if not found (Hardcoded for this user context as Bhunethri is BLR based)
-        if (!companyState) companyState = "Karnataka"
-
-        const isInterState = placeOfSupply && companyState && placeOfSupply.toLowerCase() !== companyState.toLowerCase()
-
-        // Iterate and update tax splits
-        // Note: This useEffect might cause infinite loops if we setValue blindly. 
-        // We should only strictly update if values mismatch.
-        // Actually, better to do this calculation at render or in the field onChange. 
-        // But doing it here ensures global consistency if Place of Supply changes.
-
-        // We will just read the values in rendering or strictly update.
-
-        items?.forEach((item, index) => {
-            const quantity = Number(item.quantity) || 0
-            const rate = Number(item.rate) || 0
-            const taxRate = Number(item.taxRate) || 0
-            const lineAmount = quantity * rate
-            const totalTax = (lineAmount * taxRate) / 100
-
-            let newCgst = 0, newSgst = 0, newIgst = 0
-
-            if (isInterState) {
-                newIgst = totalTax
-            } else {
-                newCgst = totalTax / 2
-                newSgst = totalTax / 2
-            }
-
-            // Only update if changed to avoid loop
-            if (item.cgstAmount !== newCgst || item.sgstAmount !== newSgst || item.igstAmount !== newIgst) {
-                // We need to be careful with infinite loops. 
-                // React Hook Form's setValue shouldn't trigger this effect unless we are watching all fields.
-                // We are watching 'items', so this IS dangerous. 
-                // Better approach: Calculate derived values during submission or rendering, 
-                // OR use a specific function to recalculate all items.
-            }
-        })
-
-    }, [items, placeOfSupply, companyProfileId, companyProfiles])
-
-    // Better Approach for Tax Calc:
-    // Create a helper to recalculate a single row's tax
-    const recalculateTaxForRow = (index: number, currentItem?: any) => {
-        const item = currentItem || form.getValues(`invoiceItems.${index}`)
-        const qty = Number(item.quantity) || 0
-        const rate = Number(item.rate) || 0
-        const taxRate = Number(item.taxRate) || 0
-
-        const lineVal = qty * rate
+    // Helper to recalculate tax for a row with explicit values
+    const recalculateTaxForRow = (index: number, quantity: number, rate: number, taxRate: number) => {
+        const lineVal = quantity * rate
         const totalTax = (lineVal * taxRate) / 100
 
         const currentPlaceOfSupply = form.getValues("placeOfSupply")
         const currentCompanyId = form.getValues("companyProfileId")
         const company = companyProfiles.find(c => c.id === currentCompanyId)
+        // Default to Karnataka if logic fails (context specific)
         const companyState = company?.gstin ? getStateFromGstin(company.gstin) : "Karnataka"
 
-        const isInterState = currentPlaceOfSupply && companyState && currentPlaceOfSupply.toLowerCase() !== companyState.toLowerCase()
+        const isInterState = currentPlaceOfSupply && companyState &&
+            currentPlaceOfSupply.toLowerCase() !== companyState.toLowerCase()
 
         if (isInterState) {
             form.setValue(`invoiceItems.${index}.igstAmount`, totalTax)
@@ -201,10 +147,21 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
 
     // Effect to recalculate ALL rows when Place of Supply or Company changes
     useEffect(() => {
-        fields.forEach((_, index) => {
-            recalculateTaxForRow(index)
+        const currentItems = form.getValues("invoiceItems")
+        currentItems?.forEach((item, index) => {
+            recalculateTaxForRow(index, Number(item.quantity) || 0, Number(item.rate) || 0, Number(item.taxRate) || 0)
         })
     }, [placeOfSupply, companyProfileId])
+
+    // Initial calculation on mount/edit-load
+    useEffect(() => {
+        if (initialData) {
+            const currentItems = form.getValues("invoiceItems")
+            currentItems?.forEach((item, index) => {
+                recalculateTaxForRow(index, Number(item.quantity) || 0, Number(item.rate) || 0, Number(item.taxRate) || 0)
+            })
+        }
+    }, []) // Run once on mount
 
 
     const subtotal = (form.watch("invoiceItems") || []).reduce((sum, item) => sum + ((item.quantity || 0) * (item.rate || 0)), 0)
@@ -431,10 +388,16 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
                                                         <FormControl>
                                                             <Input
                                                                 type="number"
+                                                                step="0.01"
                                                                 {...field}
                                                                 onChange={(e) => {
                                                                     field.onChange(e)
-                                                                    recalculateTaxForRow(index)
+                                                                    const val = parseFloat(e.target.value)
+                                                                    if (!isNaN(val)) {
+                                                                        const rate = form.getValues(`invoiceItems.${index}.rate`) || 0
+                                                                        const tax = form.getValues(`invoiceItems.${index}.taxRate`) || 0
+                                                                        recalculateTaxForRow(index, val, rate, tax)
+                                                                    }
                                                                 }}
                                                                 className="border-0 focus-visible:ring-0 text-right px-2"
                                                             />
@@ -452,10 +415,18 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
                                                         <FormControl>
                                                             <Input
                                                                 type="number"
+                                                                step="0.01"
                                                                 {...field}
                                                                 onChange={(e) => {
                                                                     field.onChange(e)
-                                                                    recalculateTaxForRow(index)
+                                                                    // Use strict parsing but allow typing decimals
+                                                                    const val = parseFloat(e.target.value)
+                                                                    // Only recalculate if it's a valid number to avoid resetting on empty
+                                                                    if (!isNaN(val)) {
+                                                                        const qty = form.getValues(`invoiceItems.${index}.quantity`) || 0
+                                                                        const tax = form.getValues(`invoiceItems.${index}.taxRate`) || 0
+                                                                        recalculateTaxForRow(index, qty, val, tax)
+                                                                    }
                                                                 }}
                                                                 className="border-0 focus-visible:ring-0 text-right px-2"
                                                             />
@@ -473,8 +444,11 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
                                                         <Select
                                                             value={field.value?.toString()}
                                                             onValueChange={(val) => {
-                                                                field.onChange(parseFloat(val))
-                                                                recalculateTaxForRow(index)
+                                                                const tax = parseFloat(val)
+                                                                field.onChange(tax)
+                                                                const qty = form.getValues(`invoiceItems.${index}.quantity`) || 0
+                                                                const rate = form.getValues(`invoiceItems.${index}.rate`) || 0
+                                                                recalculateTaxForRow(index, qty, rate, tax)
                                                             }}
                                                         >
                                                             <FormControl>

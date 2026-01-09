@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Trash2, ShieldAlert, Clock, RefreshCw } from "lucide-react"
+import { Trash2, ShieldAlert, Clock, RefreshCw, Download } from "lucide-react"
 import { toast } from "sonner"
 import { getLogs, deleteOldLogs } from "@/lib/log-actions"
 
@@ -51,6 +51,32 @@ export function ActivityLogs() {
         setDeleting(false)
     }
 
+    async function handleExport() {
+        if (logs.length === 0) return toast.error("No logs to export")
+
+        const headers = ["Timestamp", "User Name", "User Email", "Module", "Action", "Description"]
+        const csvContent = [
+            headers.join(","),
+            ...logs.map(log => [
+                new Date(log.timestamp).toISOString(),
+                `"${log.user?.name || 'System'}"`,
+                `"${log.user?.email || ''}"`,
+                `"${log.module}"`,
+                `"${log.action}"`,
+                `"${log.description.replace(/"/g, '""')}"` // Escape quotes
+            ].join(","))
+        ].join("\n")
+
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement("a")
+        link.href = url
+        link.setAttribute("download", `activity_logs_${new Date().toISOString().slice(0, 10)}.csv`)
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex items-center justify-between">
@@ -59,6 +85,9 @@ export function ActivityLogs() {
                     <p className="text-sm text-slate-500">Audit trail of actions performed by users.</p>
                 </div>
                 <div className="flex gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExport}>
+                        <Download className="h-4 w-4 mr-2" /> Export CSV
+                    </Button>
                     <Button variant="outline" size="sm" onClick={fetchLogs}>
                         <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} /> Refresh
                     </Button>

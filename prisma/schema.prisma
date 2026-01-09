@@ -1,0 +1,1041 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+  engineType = "library"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String?
+  password  String   // Hashed password
+  role      String   @default("STAFF") // ADMIN, ARCHITECT, SALES, STAFF
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  profile   UserProfile?
+  tasks     Task[]
+  activities Activity[]
+  expenses  Expense[] // Expenses recorded by this user
+  
+  // Payroll & Security
+  employee  Employee?
+  roles     UserRole[]
+  deals     CRMDeal[]
+}
+
+model UserProfile {
+  id          String   @id @default(cuid())
+  userId      String   @unique
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone       String?
+  department  String?
+  designation String?
+  address     String?
+  joinDate    DateTime?
+  salary      Float?
+  status      String   @default("Active")
+}
+
+model Customer {
+  id              String    @id @default(cuid())
+  name            String
+  email           String    @unique
+  phone           String
+  address         String?   // Billing Address
+  gstin           String?   // GST Number
+  pan             String?   // PAN Number
+  projectInterest String?
+  status          String    @default("Lead") // Lead, Prospect, Customer
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  
+  // Relations
+  invoices        Invoice[]
+  activities      Activity[]
+  deals           CRMDeal[]
+  contacts        CRMContact[]
+  
+  purchasedUnit   String?
+  // stage           String    @default("New") // Deprecated: Moved to CRMDeal/Pipeline
+  // source          String?   // Website, Referral, Ad
+  tags            String?   // Comma separated tags
+}
+
+model Invoice {
+  id          String   @id @default(cuid())
+  invoiceNo   String   @unique
+  type        String   @default("INVOICE") // INVOICE, PROFORMA
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id])
+  amount      Float    // Subtotal
+  taxRate     Float    @default(0)
+  taxAmount   Float    @default(0)
+  totalAmount Float    // Amount + Tax
+  status      String   @default("Pending") // Pending, Paid, Partial, Overdue, Draft
+  paymentStatus String @default("Unpaid") // Unpaid, Partial, Paid
+  dueDate     DateTime
+  issuedDate  DateTime @default(now())
+  // items       String   // Deprecated: Migrated to InvoiceItem relation
+  invoiceItems InvoiceItem[]
+  notes       String?
+  terms       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  payments    Payment[]
+  allocations BillAllocation[]
+  // Statutory & Compliance
+  placeOfSupply String? // State Code (e.g., "27-MAHARASHTRA")
+  gstin         String? // Snapshot of customer GSTIN
+  
+  // Tax Reconciliation
+  tdsAmount     Float    @default(0)
+  tcsAmount     Float    @default(0)
+  
+  // e-Way Bill & Logistics
+  transportMode String?  // Road, Rail, Air, Ship
+  vehicleNo     String?
+  distance      Float?
+  transporterId String?
+  
+  // e-Invoice
+  irn           String?  // Invoice Reference Number
+  ackNo         String?
+  ackDate       DateTime?
+  signedQrCode  String?
+  
+  companyProfileId String?
+  companyProfile   CompanyProfile? @relation(fields: [companyProfileId], references: [id])
+}
+
+model InvoiceItem {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description String
+  quantity    Int
+  rate        Float
+  taxRate     Float    @default(0)
+  
+  // Tax Split (Snapshot)
+  hsnCode     String?
+  cgstAmount  Float    @default(0)
+  sgstAmount  Float    @default(0)
+  igstAmount  Float    @default(0)
+  cessAmount  Float    @default(0)
+  
+  amount      Float    // Line Value
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Payment {
+  id          String   @id @default(cuid())
+  invoiceId   String
+  invoice     Invoice  @relation(fields: [invoiceId], references: [id])
+  amount      Float
+  date        DateTime @default(now())
+  method      String   // Cash, Cheque, UPI, Bank Transfer
+  reference   String?  // Transaction ID / Cheque No
+  notes       String?
+  createdAt   DateTime @default(now())
+}
+
+model Vendor {
+  id          String   @id @default(cuid())
+  name        String
+  category    String   // Supplier, Contractor, Service Provider
+  email       String?
+  phone       String?
+  address     String?
+  gstin       String?
+  status      String   @default("Active")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  expenses    Expense[]
+  
+  // statutory
+  pan         String?
+  tdsCategory String?   // Default TDS Section (e.g., 194C)
+}
+
+model TaxRate {
+  id          String   @id @default(cuid())
+  name        String   // e.g. "GST 18%", "TDS 194C"
+  rate        Float    // Total Rate (e.g., 18.0)
+  
+  // GST Split (optional, auto-calc usually, but good for custom)
+  cgst        Float    @default(0)
+  sgst        Float    @default(0)
+  igst        Float    @default(0)
+  
+  type        String   @default("GST") // GST, TDS, TCS, VAT
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Expense {
+  id          String   @id @default(cuid())
+  title       String
+  amount      Float
+  date        DateTime @default(now())
+  category    String   // Material, Labor, Office, Travel, Utilities
+  vendorId    String?
+  vendor      Vendor?  @relation(fields: [vendorId], references: [id])
+  recordedBy  String
+  user        User     @relation(fields: [recordedBy], references: [id])
+  projectId   String?
+  project     Project? @relation(fields: [projectId], references: [id])
+  paymentMethod String? // Cash, Bank, Card
+  receiptUrl  String?
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model Project {
+  id          String   @id @default(cuid())
+  name        String
+  location    String
+  status      String   @default("Planning")
+  type        String
+  unitsTotal  Int      @default(0)
+  unitsSold   Int      @default(0)
+  image       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  // Relations
+  properties  Property[]
+  expenses    Expense[]
+}
+
+model Task {
+  id          String   @id @default(cuid())
+  title       String
+  description String?
+  status      String   @default("Todo")
+  assignedTo  String
+  assignee    User     @relation(fields: [assignedTo], references: [id])
+  dueDate     DateTime?
+  createdAt   DateTime @default(now())
+}
+
+// --- Real Estate Domain ---
+
+model Property {
+  id          String   @id @default(cuid())
+  projectId   String
+  project     Project  @relation(fields: [projectId], references: [id])
+  name        String
+  type        String
+  size        String
+  price       Float
+  status      String   @default("Available")
+  features    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// --- Construction Domain ---
+
+// --- Advanced Inventory System (2026 Enterprise Standard) ---
+
+model InventoryGroup {
+  id          String           @id @default(cuid())
+  name        String
+  description String?
+  parentId    String?
+  parent      InventoryGroup?  @relation("GroupHierarchy", fields: [parentId], references: [id])
+  children    InventoryGroup[] @relation("GroupHierarchy")
+  items       InventoryItem[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model UnitOfMeasure {
+  id             String          @id @default(cuid())
+  name           String          // e.g. "Kilogram", "Box"
+  symbol         String          // e.g. "kg", "box"
+  type           String          // e.g. "MASS", "VOLUME", "COUNT"
+  baseConversion Float?          // Multiplier to base unit of type (null if base) - for future sophisticated conversions
+  items          InventoryItem[]
+  conversionsFrom UomConversion[] @relation("FromUom")
+  conversionsTo   UomConversion[] @relation("ToUom")
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model UomConversion {
+  id        String        @id @default(cuid())
+  fromUomId String
+  toUomId   String
+  factor    Float         // 1 From = factor * To
+  fromUom   UnitOfMeasure @relation("FromUom", fields: [fromUomId], references: [id])
+  toUom     UnitOfMeasure @relation("ToUom", fields: [toUomId], references: [id])
+  
+  @@unique([fromUomId, toUomId])
+}
+
+model Warehouse {
+  id          String           @id @default(cuid())
+  name        String
+  location    String?
+  manager     String?
+  capacity    String?
+  parentId    String?
+  parent      Warehouse?       @relation("WarehouseHierarchy", fields: [parentId], references: [id])
+  children    Warehouse[]      @relation("WarehouseHierarchy")
+  isBin       Boolean          @default(false) // True if this is a sub-location/bin within a warehouse
+  stocks      InventoryStock[]
+  batches     InventoryBatch[]
+  stockMovesFrom StockMovement[] @relation("SourceWarehouse")
+  stockMovesTo   StockMovement[] @relation("TargetWarehouse")
+  
+  poSources      ProductionOrder[] @relation("POSource")
+  poTargets      ProductionOrder[] @relation("POTarget")
+  
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+}
+
+model InventoryItem {
+  id             String          @id @default(cuid())
+  name           String
+  sku            String?         @unique
+  barcode        String?         @unique
+  description    String?
+  
+  groupId        String?
+  group          InventoryGroup? @relation(fields: [groupId], references: [id])
+  
+  category       String?         // Legacy/Tagging
+  
+  uomId          String?
+  uom            UnitOfMeasure?  @relation(fields: [uomId], references: [id])
+  unit           String?         // Deprecated: kept for migration safety (optional)
+  
+  // Tracking
+  isBatchTracked Boolean         @default(false)
+  isSerialTracked Boolean        @default(false)
+  
+  minLevel       Int?            @default(10)
+  maxLevel       Int?
+  reorderLevel   Int?
+  
+  currentStock   Float           @default(0)
+  lastRestock    DateTime?
+  
+  stocks         InventoryStock[]
+  batches        InventoryBatch[]
+  bom            BillOfMaterial[] // BOMs where this item is the finished good
+  bomComponents  BOMComponent[]   // BOMs where this item is a raw material
+  stockMovements StockMovement[]
+  
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model InventoryBatch {
+  id                String          @id @default(cuid())
+  itemId            String
+  item              InventoryItem   @relation(fields: [itemId], references: [id])
+  warehouseId       String?         // Optional: Batches might allow tracking per warehouse or global. Prisma relationship rules.
+  warehouse         Warehouse?      @relation(fields: [warehouseId], references: [id])
+  batchNumber       String
+  manufacturingDate DateTime?
+  expiryDate        DateTime?
+  quantity          Float           @default(0) // Quantity of this batch (globally or in context) - actually better to track in Stock
+  
+  stocks            InventoryStock[] // Stocks of this batch in various warehouses
+  
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  
+  @@unique([itemId, batchNumber])
+}
+
+model InventoryStock {
+  id          String         @id @default(cuid())
+  itemId      String
+  item        InventoryItem  @relation(fields: [itemId], references: [id])
+  warehouseId String
+  warehouse   Warehouse      @relation(fields: [warehouseId], references: [id])
+  batchId     String?
+  batch       InventoryBatch? @relation(fields: [batchId], references: [id])
+  
+  quantity    Float          @default(0)
+  
+  updatedAt   DateTime       @updatedAt
+
+  @@unique([itemId, warehouseId, batchId]) // Unique stock record per item+warehouse+batch
+}
+
+// --- Stock Ledger / Movement History ---
+
+model StockJournal {
+  id             String          @id @default(cuid())
+  date           DateTime        @default(now())
+  referenceNo    String?
+  type           String          // TRANSFER, ADJUSTMENT, PRODUCTION, CONSUMPTION
+  notes          String?
+  status         String          @default("DRAFT") // DRAFT, POSTED
+  
+  entries        StockMovement[]
+  
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+}
+
+model StockMovement {
+  id                String         @id @default(cuid())
+  journalId         String?
+  journal           StockJournal?  @relation(fields: [journalId], references: [id])
+  
+  itemId            String
+  item              InventoryItem  @relation(fields: [itemId], references: [id]) 
+  
+  sourceWarehouseId String?
+  sourceWarehouse   Warehouse?     @relation("SourceWarehouse", fields: [sourceWarehouseId], references: [id])
+  
+  targetWarehouseId String?
+  targetWarehouse   Warehouse?     @relation("TargetWarehouse", fields: [targetWarehouseId], references: [id])
+  
+  batchId           String? 
+  
+  quantity          Float
+  type              String         // INWARD, OUTWARD, TRANSFER
+  date              DateTime       @default(now())
+  notes             String?
+  
+  createdAt         DateTime       @default(now())
+}
+
+// --- Manufacturing ---
+
+model BillOfMaterial {
+  id           String         @id @default(cuid())
+  name         String
+  itemId       String         // Finished Good
+  item         InventoryItem  @relation(fields: [itemId], references: [id])
+  
+  quantity     Float          @default(1) // Output quantity
+  
+  laborCost    Float          @default(0)
+  overheadCost Float          @default(0)
+  
+  components   BOMComponent[]
+  productionOrders ProductionOrder[]
+  
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+}
+
+model BOMComponent {
+  id        String         @id @default(cuid())
+  bomId     String
+  bom       BillOfMaterial @relation(fields: [bomId], references: [id])
+  itemId    String         // Raw Material
+  item      InventoryItem  @relation(fields: [itemId], references: [id])
+  
+  quantity  Float
+  unit      String?
+  wastePct  Float          @default(0) // Wastage percentage
+}
+
+model ProductionOrder {
+  id          String         @id @default(cuid())
+  orderNumber String         @unique // PO-2026-001
+  bomId       String?
+  // Relation to BOM is optional (could be ad-hoc)
+  bom         BillOfMaterial? @relation(fields: [bomId], references: [id])
+  
+  itemId      String
+  quantity    Float
+  
+  startDate   DateTime?
+  endDate     DateTime?
+  
+  status      String         // PLANNED, IN_PROGRESS, COMPLETED, CANCELLED
+  
+  // Stock Locations
+  sourceWarehouseId String?  // Where raw materials are taken from
+  sourceWarehouse   Warehouse? @relation("POSource", fields: [sourceWarehouseId], references: [id])
+  
+  targetWarehouseId String?  // Where finished goods are stored
+  targetWarehouse   Warehouse? @relation("POTarget", fields: [targetWarehouseId], references: [id])
+
+  notes       String?
+  
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+}
+
+// --- CRM Domain Enhancements ---
+
+model Activity {
+  id          String   @id @default(cuid())
+  type        String   // Call, Meeting, Email, Note, Task
+  subject     String   // Short summary
+  description String?
+  date        DateTime @default(now())
+  
+  customerId  String?
+  customer    Customer? @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  dealId      String?
+  deal        CRMDeal?  @relation(fields: [dealId], references: [id], onDelete: Cascade)
+  
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  
+  createdAt   DateTime @default(now())
+}
+
+model CRMContact {
+  id          String   @id @default(cuid())
+  firstName   String
+  lastName    String?
+  email       String?
+  phone       String?
+  role        String?  // Decision Maker, Influencer, End User
+  
+  customerId  String
+  customer    Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  
+  isPrimary   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+model CRMPipeline {
+  id          String     @id @default(cuid())
+  name        String     // e.g., "Sales Pipeline", "Partnership Pipeline"
+  isDefault   Boolean    @default(false)
+  stages      CRMStage[]
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+}
+
+model CRMStage {
+  id          String      @id @default(cuid())
+  name        String      // e.g., "New", "Qualified", "Proposal", "Won"
+  order       Int         // 0, 1, 2, 3
+  color       String?     // Hex code for UI
+  pipelineId  String
+  pipeline    CRMPipeline @relation(fields: [pipelineId], references: [id], onDelete: Cascade)
+  deals       CRMDeal[]
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model CRMDeal {
+  id          String    @id @default(cuid())
+  title       String
+  value       Float     @default(0)
+  currency    String    @default("INR")
+  probability Int       @default(0) // 0-100%
+  expectedCloseDate DateTime?
+  
+  status      String    @default("Open") // Open, Won, Lost, Abandoned
+  
+  stageId     String
+  stage       CRMStage  @relation(fields: [stageId], references: [id])
+  
+  customerId  String
+  customer    Customer  @relation(fields: [customerId], references: [id])
+  
+  assignedTo  String?
+  assignee    User?     @relation(fields: [assignedTo], references: [id])
+  
+  activities  Activity[]
+  notes       String?
+  tags        String?   // Comma separated
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model CompanyProfile {
+  id          String   @id @default(cuid())
+  name        String
+  address     String?
+  country     String?
+  currency    String?  @default("INR")
+  timezone    String?  @default("Asia/Kolkata")
+  gstin       String?
+  pan         String?
+  email       String?
+  phone       String?
+  logoUrl     String?
+  website     String?
+  isDefault   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  invoices    Invoice[]
+  vouchers    Voucher[]
+}
+
+// --- Core Accounting Domain (Double Entry) ---
+
+model AccountGroup {
+  id          String        @id @default(cuid())
+  name        String        @unique // e.g., Current Assets, Indirect Expenses
+  type        String        // ASSET, LIABILITY, INCOME, EXPENSE, EQUITY
+  parentGroupId String?
+  parentGroup AccountGroup? @relation("GroupHierarchy", fields: [parentGroupId], references: [id])
+  subGroups   AccountGroup[] @relation("GroupHierarchy")
+  heads       AccountHead[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model AccountHead {
+  id          String        @id @default(cuid())
+  name        String
+  code        String?       @unique
+  groupId     String
+  group       AccountGroup  @relation(fields: [groupId], references: [id])
+  openingBalance Float      @default(0)
+  currentBalance Float      @default(0) // Cached balance
+  type        String        // Dr or Cr (nature)
+  
+  // Relations to sub-ledgers
+  customerId  String?       @unique
+  vendorId    String?       @unique
+  
+  // Banking Relation
+  bankAccount BankAccount?
+  
+  ledgerEntries VoucherEntry[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model Voucher {
+  id          String        @id @default(cuid())
+  voucherNo   String        @unique
+  date        DateTime
+  type        String        // SALES, PURCHASE, RECEIPT, PAYMENT, CONTRA, JOURNAL
+  narration   String?
+  reference   String?       // External ref like Cheque No
+  status      String        @default("DRAFT") // DRAFT, POSTED, CANCELLED
+  companyId   String?
+  company     CompanyProfile? @relation(fields: [companyId], references: [id])
+  
+  entries     VoucherEntry[]
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  createdBy   String?       // UserId
+
+  // Banking Relations
+  chequeLeaf  ChequeLeaf?
+  statementLines BankStatementLine[]
+  payslip     Payslip[]
+}
+
+model VoucherEntry {
+  id          String        @id @default(cuid())
+  voucherId   String
+  voucher     Voucher       @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  accountId   String
+  account     AccountHead   @relation(fields: [accountId], references: [id])
+  
+  debit       Float         @default(0)
+  credit      Float         @default(0)
+  
+  // Multi-Currency
+  currency    String        @default("INR") // e.g. USD, EUR
+  exchangeRate Float        @default(1.0)
+  foreignAmount Float       @default(0)
+  
+  // Cost Center
+  costCenterId String?
+  costCenter  CostCenter?   @relation(fields: [costCenterId], references: [id])
+  
+  // Bill-to-Bill
+  allocations BillAllocation[]
+
+  createdAt   DateTime      @default(now())
+}
+
+model CostCenter {
+  id          String        @id @default(cuid())
+  name        String
+  code        String?       @unique
+  budget      Float         @default(0)
+  
+  voucherEntries VoucherEntry[]
+  
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+}
+
+model BillAllocation {
+  id             String       @id @default(cuid())
+  voucherEntryId String
+  voucherEntry   VoucherEntry @relation(fields: [voucherEntryId], references: [id], onDelete: Cascade)
+  
+  invoiceId      String
+  invoice        Invoice      @relation(fields: [invoiceId], references: [id])
+  
+  amount         Float
+  createdAt      DateTime     @default(now())
+}
+
+
+// --- Banking Domain ---
+
+model BankAccount {
+  id            String   @id @default(cuid())
+  name          String   // e.g. "HDFC Main"
+  accountNumber String   @unique
+  ifsc          String?
+  bankName      String?
+  branch        String?
+  currency      String   @default("INR")
+  
+  accountHeadId String?  @unique // Link to Ledger for auto-posting
+  accountHead   AccountHead? @relation(fields: [accountHeadId], references: [id])
+  
+  currentBalance Float    @default(0) // System Balance
+  
+  chequeBooks   ChequeBook[]
+  statementLines BankStatementLine[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ChequeBook {
+  id            String   @id @default(cuid())
+  bankAccountId String
+  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  
+  startLeaf     String   // e.g. "000001"
+  endLeaf       String   // e.g. "000050"
+  status        String   @default("Active") // Active, Exhausted
+  
+  leaves        ChequeLeaf[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model ChequeLeaf {
+  id            String   @id @default(cuid())
+  chequeBookId  String
+  chequeBook    ChequeBook @relation(fields: [chequeBookId], references: [id], onDelete: Cascade)
+  
+  leafNumber    String
+  status        String   @default("Available") // Available, Issued, Used, Cancelled, Void
+  
+  voucherId     String?  @unique
+  voucher       Voucher? @relation(fields: [voucherId], references: [id])
+  
+  issuedTo      String?
+  issuedDate    DateTime?
+  amount        Float?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BankStatementLine {
+  id            String   @id @default(cuid())
+  bankAccountId String
+  bankAccount   BankAccount @relation(fields: [bankAccountId], references: [id], onDelete: Cascade)
+  
+  date          DateTime
+  amount        Float    // +ve for Credit, -ve for Debit
+  type          String   // Credit/Debit
+  description   String?
+  refNo         String?  // UTR / Cheque No
+  balance       Float?   // Running balance in statement
+  
+  isReconciled  Boolean  @default(false)
+  matchedVoucherId String?
+  matchedVoucher   Voucher? @relation(fields: [matchedVoucherId], references: [id])
+  
+  importId      String?  // To track batch uploads
+  
+  createdAt     DateTime @default(now())
+}
+
+// --- Payroll Domain ---
+
+model Employee {
+  id            String   @id @default(cuid())
+  code          String   @unique // e.g., EMP001
+  firstName     String
+  lastName      String
+  email         String?  @unique
+  phone         String?
+  
+  designationId String?
+  designation   HRDesignation? @relation(fields: [designationId], references: [id])
+  
+  departmentId  String?
+  department    HRDepartment? @relation(fields: [departmentId], references: [id])
+  
+  shiftId       String?
+  shift         HRShift?      @relation(fields: [shiftId], references: [id])
+  
+  joinDate      DateTime?
+  dob           DateTime?
+  gender        String?
+  
+  // Statutory Details
+  pan           String?
+  aadhar        String?
+  uan           String?   // PF
+  pfNumber      String?
+  esiNumber     String?
+  
+  // Salary Structure (New)
+  salaryStructure EmployeePayHead[]
+  
+  // Legacy Salary Fields (Deprecated but kept for safety during migration)
+  basicSalary   Float    @default(0)
+  hra           Float    @default(0)
+  allowances    Float    @default(0)
+  pfDeduction   Float    @default(0) 
+  ptDeduction   Float    @default(0)
+  
+  // Bank Details
+  bankName      String?
+  accountNumber String?
+  ifsc          String?
+  
+  status        String   @default("Active") // Active, Resigned, Terminated
+  
+  // Optional Link to System User (for self-service)
+  userId        String?  @unique
+  user          User?    @relation(fields: [userId], references: [id])
+  
+  attendance    Attendance[]
+  payslips      Payslip[]
+  leaveRequests HRLeaveRequest[]
+  leaveBalances HRLeaveBalance[]
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model Attendance {
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  date          DateTime
+  status        String   // Present, Absent, Leave, Half-Day
+  checkIn       DateTime?
+  checkOut      DateTime?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([employeeId, date])
+}
+
+model Payslip {
+  id            String   @id @default(cuid())
+  employeeId    String
+  employee      Employee @relation(fields: [employeeId], references: [id])
+  
+  month         Int
+  year          Int
+  
+  // Earnings
+  basic         Float
+  hra           Float
+  allowances    Float
+  bonus         Float    @default(0)
+  
+  // Deductions
+  pf            Float
+  pt            Float
+  tds           Float    @default(0)
+  advance       Float    @default(0)
+  otherDeduction Float   @default(0)
+  
+  netSalary     Float
+  
+  status        String   @default("Draft") // Draft, Generated, Paid
+  paymentDate   DateTime?
+  
+  // Link to Accounting
+  voucherId     String?
+  voucher       Voucher? @relation(fields: [voucherId], references: [id])
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@unique([employeeId, month, year])
+}
+
+// --- Security Domain ---
+
+// --- HR & Payroll System Extensions ---
+
+model HRDepartment {
+  id        String         @id @default(cuid())
+  name      String         @unique
+  parentId  String?
+  parent    HRDepartment?  @relation("DeptHierarchy", fields: [parentId], references: [id])
+  children  HRDepartment[] @relation("DeptHierarchy")
+  
+  employees Employee[]
+  
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+}
+
+model HRDesignation {
+  id        String     @id @default(cuid())
+  name      String     @unique
+  employees Employee[]
+  
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+}
+
+model HRPayHead {
+  id              String  @id @default(cuid())
+  name            String  // e.g. Basic, HRA, PF, PT
+  type            String  // EARNING, DEDUCTION, REIMBURSEMENT
+  calculationType String  // FLAT, FORMULA, PERCENTAGE_OF_BASIC
+  isStatutory     Boolean @default(false)
+  commonAmount    Float?  // Default amount if flat
+  
+  employeePayHeads EmployeePayHead[]
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model EmployeePayHead {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  payHeadId   String
+  payHead     HRPayHead @relation(fields: [payHeadId], references: [id])
+  
+  amount      Float     @default(0) // Override or calculated base amount
+  formula     String?   // Optional formula override
+  
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@unique([employeeId, payHeadId])
+}
+
+model HRLeaveType {
+  id              String   @id @default(cuid())
+  name            String   @unique // CL, PL, SL
+  daysAllowed     Int      @default(0)
+  carryForwardMax Int      @default(0)
+  
+  requests        HRLeaveRequest[]
+  balances        HRLeaveBalance[]
+}
+
+model HRLeaveRequest {
+  id          String      @id @default(cuid())
+  employeeId  String
+  employee    Employee    @relation(fields: [employeeId], references: [id])
+  
+  leaveTypeId String
+  leaveType   HRLeaveType @relation(fields: [leaveTypeId], references: [id])
+  
+  startDate   DateTime
+  endDate     DateTime
+  days        Float
+  reason      String?
+  status      String      @default("PENDING") // PENDING, APPROVED, REJECTED
+  
+  approvedBy  String?
+  
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+}
+
+model HRLeaveBalance {
+  id          String      @id @default(cuid())
+  employeeId  String
+  employee    Employee    @relation(fields: [employeeId], references: [id])
+  
+  leaveTypeId String
+  leaveType   HRLeaveType @relation(fields: [leaveTypeId], references: [id])
+  
+  balance     Float       @default(0)
+  year        Int
+  
+  @@unique([employeeId, leaveTypeId, year])
+}
+
+model HRShift {
+  id        String     @id @default(cuid())
+  name      String     @unique // e.g. General, Night
+  startTime String     // 09:00
+  endTime   String     // 18:00
+  
+  employees Employee[]
+}
+
+// Security & Audit
+model AppConfig {
+  id            String   @id @default(cuid())
+  key           String   @unique // e.g., "VAULT_PIN"
+  value         String   // Encrypted value
+  updatedAt     DateTime @updatedAt
+}
+
+model Role {
+  id            String   @id @default(cuid())
+  name          String   @unique // e.g., "Accountant", "HR Manager"
+  permissions   String   // JSON string of permissions e.g., ["VIEW_ACCOUNTS", "EDIT_INVOICES"]
+  description   String?
+  
+  users         UserRole[]
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model UserRole {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  roleId        String
+  role          Role     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, roleId])
+}
+
+model CommunicationLog {
+  id            String   @id @default(cuid())
+  subject       String
+  body          String
+  recipientType String   // Client, Vendor, Employee
+  recipientId   String?  // Optional link
+  status        String   @default("Sent") // Sent, Draft, Failed
+  sentBy        String?  // UserId
+  sentAt        DateTime @default(now())
+}

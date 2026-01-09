@@ -5,7 +5,7 @@ import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Plus, MoreHorizontal, Calendar, DollarSign } from "lucide-react"
+import { Plus, MoreHorizontal, Calendar, IndianRupee } from "lucide-react"
 import { updateDealStage } from "@/lib/crm-actions"
 import { toast } from "sonner"
 import { ContactActions } from "@/components/admin/contact-actions"
@@ -106,8 +106,8 @@ export default function CRMKanbanBoard({ pipeline, deals }: { pipeline: Pipeline
                                                                 <div className="font-medium text-sm line-clamp-2">{deal.title}</div>
                                                                 <div className="flex items-center justify-between text-xs text-muted-foreground">
                                                                     <div className="flex items-center gap-1">
-                                                                        <DollarSign className="w-3 h-3" />
-                                                                        {deal.value.toLocaleString()}
+                                                                        <IndianRupee className="w-3 h-3" />
+                                                                        {deal.value.toLocaleString('en-IN')}
                                                                     </div>
                                                                     {deal.customer && (
                                                                         <div className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded truncate max-w-[100px]">

@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { InvoiceList } from "@/components/admin/invoice-list"
-import { DollarSign, PieChart, TrendingUp, CreditCard, Link as LinkIcon, FolderTree, Target, Landmark } from "lucide-react"
+import { IndianRupee, PieChart, TrendingUp, CreditCard, Link as LinkIcon, FolderTree, Target, Landmark } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 
@@ -54,10 +54,13 @@ export default async function AccountsPage() {
                     <div className="text-2xl font-bold">₹85k</div>
                     <p className="text-xs text-muted-foreground">This Month</p>
                 </Link>
+
+// ... (skipping unchanged lines)
+
                 <div className="rounded-xl border bg-card text-card-foreground shadow-sm p-6">
                     <div className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <h3 className="tracking-tight text-sm font-medium text-muted-foreground">Net Cashflow</h3>
-                        <DollarSign className="h-4 w-4 text-muted-foreground" />
+                        <IndianRupee className="h-4 w-4 text-muted-foreground" />
                     </div>
                     <div className="text-2xl font-bold text-green-600">+₹12.5L</div>
                     <p className="text-xs text-muted-foreground">Healthy</p>
@@ -78,7 +81,7 @@ export default async function AccountsPage() {
                     <div className="text-2xl font-bold">Manage</div>
                     <p className="text-xs text-muted-foreground">Accounts, Cheques, Reconciliation</p>
                 </Link>
-            </div>
+            </div >
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
                 <div className="col-span-4 rounded-xl border bg-card text-card-foreground shadow-sm p-6">
@@ -122,7 +125,7 @@ export default async function AccountsPage() {
                 </div>
                 <InvoiceList initialInvoices={invoices} />
             </div>
-        </div>
+        </div >
     )
 }
 

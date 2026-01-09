@@ -433,9 +433,7 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
                                                                 type="number"
                                                                 {...field}
                                                                 onChange={(e) => {
-                                                                    const val = parseFloat(e.target.value)
-                                                                    field.onChange(val)
-                                                                    // We pass the updated value to recalculate immediately
+                                                                    field.onChange(e)
                                                                     recalculateTaxForRow(index)
                                                                 }}
                                                                 className="border-0 focus-visible:ring-0 text-right px-2"
@@ -456,8 +454,7 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
                                                                 type="number"
                                                                 {...field}
                                                                 onChange={(e) => {
-                                                                    const val = parseFloat(e.target.value)
-                                                                    field.onChange(val)
+                                                                    field.onChange(e)
                                                                     recalculateTaxForRow(index)
                                                                 }}
                                                                 className="border-0 focus-visible:ring-0 text-right px-2"

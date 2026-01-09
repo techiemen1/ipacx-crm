@@ -31,6 +31,14 @@ export async function createDesignation(name: string) {
 
 export async function createShift(data: { name: string, startTime: string, endTime: string }) {
     try {
+        const existing = await prisma.hRShift.findUnique({
+            where: { name: data.name }
+        })
+
+        if (existing) {
+            return { error: "Shift with this name already exists" }
+        }
+
         await prisma.hRShift.create({ data })
         revalidatePath("/admin/hr")
         return { success: true }

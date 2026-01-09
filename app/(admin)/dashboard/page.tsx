@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { Users, Building, DollarSign, Activity, TrendingUp, ArrowUpRight, Clock, Star } from "lucide-react"
+import { Users, Building, IndianRupee, Activity, TrendingUp, ArrowUpRight, Clock, Star } from "lucide-react"
 
 export default function DashboardPage() {
 
@@ -10,7 +10,7 @@ export default function DashboardPage() {
         {
             name: "Total Revenue",
             value: "₹2.4 Cr",
-            icon: DollarSign,
+            icon: IndianRupee,
             change: "+12.5%",
             trend: "up",
             desc: "vs last month",
@@ -71,7 +71,7 @@ export default function DashboardPage() {
                 <Button variant="outline" className="h-auto flex-col gap-2 p-4 min-w-[120px] hover:border-primary hover:bg-primary/5 transition-colors" asChild>
                     <Link href="/admin/accounts/invoices/new">
                         <div className="p-2 rounded-full bg-blue-100 text-blue-600">
-                            <DollarSign className="h-5 w-5" />
+                            <IndianRupee className="h-5 w-5" />
                         </div>
                         <span className="text-xs font-medium">New Invoice</span>
                     </Link>

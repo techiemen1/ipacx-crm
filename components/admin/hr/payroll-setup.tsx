@@ -48,13 +48,17 @@ export default function PayrollSetup({ payHeads, departments, designations, shif
     }
 
     // Shifts
-    // Using simple state for shift creation - could be expanded to full dialog if needed
-    // Default 9-6
+    const [shiftData, setShiftData] = useState({ name: "", startTime: "09:00", endTime: "18:00" })
     const createShiftAction = async () => {
-        const res = await import("@/lib/hr-actions").then(m => m.createShift({ name: "General Shift", startTime: "09:00", endTime: "18:00" }))
+        if (!shiftData.name || !shiftData.startTime || !shiftData.endTime) {
+            return toast.error("All fields required")
+        }
+        const m = await import("@/lib/hr-actions")
+        const res = await m.createShift(shiftData)
         if (res.error) toast.error(res.error)
         else {
-            toast.success("Default Shift Created")
+            toast.success("Shift Created")
+            setShiftData({ name: "", startTime: "09:00", endTime: "18:00" })
             router.refresh()
         }
     }
@@ -110,9 +114,34 @@ export default function PayrollSetup({ payHeads, departments, designations, shif
                     <CardContent className="space-y-4">
                         <p className="text-sm text-muted-foreground">Define work timings for employees.</p>
                         {/* Placeholder for more complex shift UI */}
-                        <div className="flex justify-between items-center bg-muted p-3 rounded-md">
-                            <span className="text-sm font-medium">General Shift (09:00 - 18:00)</span>
-                            <Button size="sm" variant="outline" onClick={createShiftAction}>Create / Reset Default</Button>
+                        <div className="grid gap-4 bg-muted p-4 rounded-md">
+                            <div className="grid gap-2">
+                                <Label>Shift Name</Label>
+                                <Input
+                                    placeholder="e.g. Morning Shift"
+                                    value={shiftData.name}
+                                    onChange={e => setShiftData({ ...shiftData, name: e.target.value })}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="grid gap-2">
+                                    <Label>Start Time</Label>
+                                    <Input
+                                        type="time"
+                                        value={shiftData.startTime}
+                                        onChange={e => setShiftData({ ...shiftData, startTime: e.target.value })}
+                                    />
+                                </div>
+                                <div className="grid gap-2">
+                                    <Label>End Time</Label>
+                                    <Input
+                                        type="time"
+                                        value={shiftData.endTime}
+                                        onChange={e => setShiftData({ ...shiftData, endTime: e.target.value })}
+                                    />
+                                </div>
+                            </div>
+                            <Button size="sm" onClick={createShiftAction}>Create Shift</Button>
                         </div>
 
                         <div className="mt-4">

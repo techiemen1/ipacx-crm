@@ -20,7 +20,7 @@ export default async function DashboardPage() {
 
     // Assuming Properties Sold = Invoices for Project/Property or just Deals won
     const propertiesSold = await prisma.cRMDeal.count({
-        where: { stage: 'Won' }
+        where: { status: 'Won' }
     })
 
     // Site Visits from Activities

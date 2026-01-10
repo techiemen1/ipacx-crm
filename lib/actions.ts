@@ -375,8 +375,12 @@ export async function recordPayment(data: unknown) {
 }
 
 export async function updateInvoice(id: string, data: unknown) {
+    console.log(`[ACTION] updateInvoice called for ID: ${id}`)
     const validated = invoiceSchema.safeParse(data)
-    if (!validated.success) return { error: "Invalid data" }
+    if (!validated.success) {
+        console.error("Validation Error in updateInvoice:", validated.error.flatten())
+        return { error: `Invalid data: ${Object.values(validated.error.flatten().fieldErrors).flat().join(", ")}` }
+    }
     const { invoiceNo, customerId, dueDate, status, invoiceItems, type, notes, terms } = validated.data
 
     // Calculate totals from items
@@ -391,7 +395,31 @@ export async function updateInvoice(id: string, data: unknown) {
                 where: { invoiceId: id }
             })
 
-            // 2. Update invoice with new items and recalculated totals
+            // 2. Determine Status - Check payments
+            // Only query payments if we aren't forcing a specific status manually (like Paid)
+            // But usually, status is derived. Let's make it robust.
+            const existingPayments = await tx.payment.findMany({
+                where: { invoiceId: id }
+            })
+            const totalPaid = existingPayments.reduce((sum, p) => sum + p.amount, 0)
+
+            let finalStatus = status
+            let finalPaymentStatus = "Unpaid"
+
+            if (totalPaid >= totalAmount && totalAmount > 0) {
+                finalStatus = "Paid"
+                finalPaymentStatus = "Paid"
+            } else if (totalPaid > 0) {
+                finalStatus = "Partial" // Or keep existing if it was 'Overdue' etc? Let's obey strict logic for now.
+                finalPaymentStatus = "Partial"
+            } else {
+                // No payments. If user set "Draft", keep it. If "Pending" or other, keep it.
+                // But ensure paymentStatus is Unpaid.
+                finalPaymentStatus = "Unpaid"
+                if (finalStatus === "Paid") finalStatus = "Pending" // Prevent Paid status without payments
+            }
+
+            // 3. Update invoice with new items and recalculated totals
             await tx.invoice.update({
                 where: { id },
                 data: {
@@ -402,8 +430,8 @@ export async function updateInvoice(id: string, data: unknown) {
                     taxAmount: taxTotal,
                     totalAmount,
                     dueDate: new Date(dueDate),
-                    status,
-                    paymentStatus: status === 'Paid' ? 'Paid' : 'Unpaid',
+                    status: finalStatus,
+                    paymentStatus: finalPaymentStatus,
                     type,
                     invoiceItems: {
                         create: invoiceItems || []
@@ -424,6 +452,8 @@ export async function updateInvoice(id: string, data: unknown) {
         })
 
         revalidatePath("/admin/accounts")
+        revalidatePath(`/admin/accounts/invoices/${id}`)
+        revalidatePath(`/admin/accounts/invoices/${id}/edit`)
         return { success: true }
     } catch (e) {
         console.error(e)
@@ -432,12 +462,18 @@ export async function updateInvoice(id: string, data: unknown) {
 }
 
 export async function deleteInvoice(id: string) {
+    console.log(`[ACTION] deleteInvoice called for ID: ${id}`)
     try {
-        await prisma.invoice.delete({ where: { id } })
+        await prisma.$transaction([
+            prisma.payment.deleteMany({ where: { invoiceId: id } }),
+            prisma.invoiceItem.deleteMany({ where: { invoiceId: id } }),
+            prisma.invoice.delete({ where: { id } })
+        ])
         revalidatePath("/admin/accounts")
         return { success: true }
-    } catch {
-        return { error: "Failed to delete invoice" }
+    } catch (e) {
+        console.error(e)
+        return { error: "Failed to delete invoice (Likely linked data)" }
     }
 }
 // ... existing imports
@@ -601,33 +637,63 @@ export async function resetApplicationData() {
     if ((session?.user as any)?.role !== "ADMIN") return { error: "Unauthorized" }
 
     try {
+        // SQLite "Nuclear" Reset - Bypass FKs temporarily to forcefully clear data
+        await prisma.$executeRawUnsafe("PRAGMA foreign_keys = OFF;")
+
         await prisma.$transaction([
-            // Delete transactional data in order of dependencies
+            prisma.billAllocation.deleteMany(),
+            prisma.voucherEntry.deleteMany(),
+            prisma.voucher.deleteMany(),
+            prisma.stockMovement.deleteMany(),
+            prisma.stockJournal.deleteMany(),
+            prisma.inventoryStock.deleteMany(),
+            prisma.inventoryBatch.deleteMany(),
+            prisma.productionOrder.deleteMany(),
+            prisma.bOMComponent.deleteMany(),
+            prisma.billOfMaterial.deleteMany(),
             prisma.payment.deleteMany(),
             prisma.invoiceItem.deleteMany(),
             prisma.invoice.deleteMany(),
             prisma.expense.deleteMany(),
-            prisma.cRMDeal.deleteMany(),
             prisma.activity.deleteMany(),
+            prisma.cRMContact.deleteMany(),
+            prisma.cRMDeal.deleteMany(),
+            prisma.task.deleteMany(),
+            prisma.hRLeaveRequest.deleteMany(),
+            prisma.hRLeaveBalance.deleteMany(),
             prisma.attendance.deleteMany(),
             prisma.payslip.deleteMany(),
-
-            // Delete secondary entities
-            prisma.project.deleteMany(),
+            prisma.communicationLog.deleteMany(),
+            prisma.internalLog.deleteMany(),
+            prisma.costCenter.deleteMany(),
             prisma.property.deleteMany(),
             prisma.inventoryItem.deleteMany(),
-            prisma.vendor.deleteMany(), // If vendors are linked to expenses
-
-            // Create/Delete logic for Customers?
-            // Usually "Reset Data" implies clearing business data but maybe keeping settings
-            // Let's clear Customers too as they are "Data"
+            prisma.vendor.deleteMany(),
             prisma.customer.deleteMany(),
+            prisma.project.deleteMany(),
+            prisma.companyProfile.deleteMany(),
+            prisma.bankAccount.deleteMany(),
+            prisma.accountHead.deleteMany(),
+            prisma.accountGroup.deleteMany(),
+            // Optional: Keep Admin User
+            // prisma.user.deleteMany({ where: { role: { not: "ADMIN" } } })
         ])
+
+        await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON;")
 
         revalidatePath("/", "layout")
         return { success: true }
-    } catch (e) {
-        console.error(e)
-        return { error: "Failed to reset data" }
+    } catch (e: any) {
+        console.error("Hard Reset Failed:", e)
+        // Ensure FKs are back on even if fail
+        try { await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON;") } catch { }
+        return { error: `Failed to reset data: ${e.message}` }
     }
+
+    revalidatePath("/", "layout")
+    return { success: true }
+} catch (e) {
+    console.error(e)
+    return { error: "Failed to reset data" }
+}
 }

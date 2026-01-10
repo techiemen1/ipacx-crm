@@ -55,7 +55,17 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
                 cessAmount: item.cessAmount || 0
             })) || [{ description: "", quantity: 1, rate: 0, taxRate: 0, amount: 0, cgstAmount: 0, sgstAmount: 0, igstAmount: 0, cessAmount: 0 }],
             companyProfileId: initialData.companyProfileId || (companyProfiles.length > 0 ? companyProfiles[0].id : ""),
-            placeOfSupply: initialData.placeOfSupply || ""
+            placeOfSupply: initialData.placeOfSupply || "",
+            // Sanitize potential nulls from DB to avoid Zod "optional" vs "nullable" validation conflicts
+            notes: initialData.notes || "",
+            terms: initialData.terms || "Payment due within 15 days.",
+            gstin: initialData.gstin || "",
+            transportMode: initialData.transportMode || "",
+            vehicleNo: initialData.vehicleNo || "",
+            transporterId: initialData.transporterId || "",
+            distance: initialData.distance || 0,
+            tcsAmount: initialData.tcsAmount || 0,
+            tdsAmount: initialData.tdsAmount || 0
         } : {
             invoiceNo: "",
             customerId: "",
@@ -171,8 +181,7 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
 
     async function onSubmit(data: InvoiceFormValues) {
         setLoading(true)
-        // Ensure tax splits are verified one last time? 
-        // The form data already contains them as we updated them.
+        console.log("Submitting Invoice Data:", data)
 
         let result;
         if (initialData) {
@@ -182,7 +191,9 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
         }
         setLoading(false)
 
-        if (result.error) {
+        console.log("Server Action Result:", result)
+
+        if (result?.error) {
             toast.error(result.error)
         } else {
             toast.success(initialData ? "Invoice updated successfully" : "Invoice generated successfully")
@@ -193,7 +204,10 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
 
     return (
         <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6 max-w-5xl mx-auto p-6 bg-card border rounded-xl shadow-sm">
+            <form onSubmit={form.handleSubmit(onSubmit, (errors) => {
+                console.error("Form Validation Errors:", errors)
+                toast.error(`Please check the form for errors: ${Object.keys(errors).join(", ")}`)
+            })} className="space-y-6 max-w-5xl mx-auto p-6 bg-card border rounded-xl shadow-sm">
                 <div className="flex items-center justify-between border-b pb-4 mb-4">
                     <h2 className="text-xl font-bold">{initialData ? "Edit Invoice" : "Create New Invoice"}</h2>
                     <div className="flex items-center gap-2">
@@ -202,7 +216,7 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
                             name="type"
                             render={({ field }) => (
                                 <FormItem className="w-[150px]">
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue />
@@ -221,7 +235,7 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
                             name="status"
                             render={({ field }) => (
                                 <FormItem className="w-[150px]">
-                                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                    <Select onValueChange={field.onChange} value={field.value}>
                                         <FormControl>
                                             <SelectTrigger>
                                                 <SelectValue placeholder="Status" />
@@ -246,7 +260,7 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Billing Company</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value || ""}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select Company" />
@@ -282,7 +296,7 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Customer</FormLabel>
-                                <Select onValueChange={field.onChange} defaultValue={field.value}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select Customer" />
@@ -304,7 +318,7 @@ export function InvoiceForm({ customers, initialData, inventoryItems = [], taxRa
                         render={({ field }) => (
                             <FormItem>
                                 <FormLabel>Place of Supply</FormLabel>
-                                <Select onValueChange={field.onChange} value={field.value || undefined}>
+                                <Select onValueChange={field.onChange} value={field.value}>
                                     <FormControl>
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select State" />

@@ -45,6 +45,8 @@ export function InvoiceList({ initialInvoices }: InvoiceListProps) {
         setPaymentModalOpen(true)
     }
 
+    const [sendingReminders, setSendingReminders] = useState(false)
+
     const handleDelete = async (id: string) => {
         if (!confirm("Are you sure you want to delete this invoice?")) return
         const res = await deleteInvoice(id)
@@ -56,8 +58,34 @@ export function InvoiceList({ initialInvoices }: InvoiceListProps) {
         }
     }
 
+    const handleRunReminders = async () => {
+        setSendingReminders(true)
+        try {
+            const res = await fetch("/api/cron/reminders")
+            const data = await res.json()
+            if (data.success) {
+                toast.success(`Processed ${data.processed} invoices. Sent ${data.sent} emails.`)
+            } else {
+                toast.error("Failed to send reminders: " + data.error)
+            }
+        } catch (e) {
+            toast.error("Failed to run reminders job")
+        } finally {
+            setSendingReminders(false)
+        }
+    }
+
     return (
-        <>
+        <div className="space-y-4">
+            <div className="flex justify-end">
+                <Button
+                    variant="outline"
+                    onClick={handleRunReminders}
+                    disabled={sendingReminders}
+                >
+                    {sendingReminders ? "Sending..." : "Send Payment Reminders"}
+                </Button>
+            </div>
             <Table>
                 <TableHeader>
                     <TableRow>
@@ -134,6 +162,6 @@ export function InvoiceList({ initialInvoices }: InvoiceListProps) {
                     onOpenChange={setPaymentModalOpen}
                 />
             )}
-        </>
+        </div>
     )
 }

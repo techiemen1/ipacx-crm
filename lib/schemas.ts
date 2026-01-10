@@ -59,10 +59,10 @@ export const invoiceSchema = z.object({
     tcsAmount: z.coerce.number().default(0),
 
     // Transport
-    transportMode: z.string().optional(),
-    vehicleNo: z.string().optional(),
+    transportMode: z.string().nullable().optional(),
+    vehicleNo: z.string().nullable().optional(),
     distance: z.coerce.number().optional(),
-    transporterId: z.string().optional()
+    transporterId: z.string().nullable().optional()
 })
 
 export const vendorSchema = z.object({

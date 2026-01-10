@@ -1,49 +1,71 @@
-"use client"
-
+import { prisma } from "@/lib/prisma"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Users, Building, IndianRupee, Activity, TrendingUp, ArrowUpRight, Clock, Star } from "lucide-react"
 
-export default function DashboardPage() {
+export const dynamic = 'force-dynamic'
+
+export default async function DashboardPage() {
+
+    // Fetch real data
+    const totalRevenueAgg = await prisma.invoice.aggregate({
+        where: { status: 'Paid' },
+        _sum: { totalAmount: true }
+    })
+    const totalRevenue = totalRevenueAgg._sum.totalAmount || 0
+
+    const activeLeadsCount = await prisma.customer.count({
+        where: { status: 'Lead' }
+    })
+
+    // Assuming Properties Sold = Invoices for Project/Property or just Deals won
+    const propertiesSold = await prisma.cRMDeal.count({
+        where: { stage: 'Won' }
+    })
+
+    // Site Visits from Activities
+    const siteVisits = await prisma.activity.count({
+        where: { type: 'Site Visit' }
+    })
 
     const stats = [
         {
             name: "Total Revenue",
-            value: "₹2.4 Cr",
+            value: `₹${totalRevenue.toLocaleString('en-IN')}`,
             icon: IndianRupee,
-            change: "+12.5%",
+            change: "Real-time",
             trend: "up",
-            desc: "vs last month",
+            desc: "Paid Invoices",
             color: "text-emerald-600",
             bg: "bg-emerald-100"
         },
         {
             name: "Active Leads",
-            value: "142",
+            value: activeLeadsCount.toString(),
             icon: Users,
-            change: "+8.2%",
+            change: "Real-time",
             trend: "up",
-            desc: "12 new today",
+            desc: "Total Leads",
             color: "text-blue-600",
             bg: "bg-blue-100"
         },
         {
-            name: "Properties Sold",
-            value: "24",
+            name: "Deals Won",
+            value: propertiesSold.toString(),
             icon: Building,
-            change: "-2%",
-            trend: "down",
-            desc: "This quarter",
+            change: "Real-time",
+            trend: "up",
+            desc: "Closed Deals",
             color: "text-amber-600",
             bg: "bg-amber-100"
         },
         {
             name: "Site Visits",
-            value: "86",
+            value: siteVisits.toString(),
             icon: Activity,
-            change: "+24%",
+            change: "Real-time",
             trend: "up",
-            desc: "This week",
+            desc: "Recorded Visits",
             color: "text-purple-600",
             bg: "bg-purple-100"
         },
@@ -58,7 +80,7 @@ export default function DashboardPage() {
                         Executive Overview
                     </h1>
                     <p className="text-slate-300 max-w-xl">
-                        Welcome back, Admin. Here's what's happening across your projects and CRM today.
+                        Welcome back, Admin. Real-time insights from your application.
                     </p>
                 </div>
                 {/* Decorative background elements */}
@@ -102,15 +124,9 @@ export default function DashboardPage() {
                             <div className={`rounded-xl p-2.5 ${stat.bg} ${stat.color}`}>
                                 <stat.icon className="h-5 w-5" />
                             </div>
-                            {stat.trend === 'up' ? (
-                                <div className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
-                                    <TrendingUp className="h-3 w-3" /> {stat.change}
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-1 rounded-full bg-red-50 px-2 py-1 text-xs font-medium text-red-700">
-                                    <TrendingUp className="h-3 w-3 rotate-180" /> {stat.change}
-                                </div>
-                            )}
+                            <div className="flex items-center gap-1 rounded-full bg-green-50 px-2 py-1 text-xs font-medium text-green-700">
+                                <TrendingUp className="h-3 w-3" /> {stat.change}
+                            </div>
                         </div>
                         <div className="space-y-1">
                             <h3 className="text-sm font-medium text-muted-foreground">{stat.name}</h3>
@@ -121,102 +137,8 @@ export default function DashboardPage() {
                 ))}
             </div>
 
-            {/* Main Content Grid */}
-            <div className="grid gap-6 md:grid-cols-7">
-
-                {/* Recent Leads Feed */}
-                <div className="col-span-4 rounded-2xl border bg-card shadow-sm">
-                    <div className="flex items-center justify-between border-b p-6">
-                        <div className="space-y-1">
-                            <h3 className="font-semibold leading-none tracking-tight">Recent Inquiries</h3>
-                            <p className="text-sm text-muted-foreground">Latest leads from all sources</p>
-                        </div>
-                        <button className="text-xs font-medium text-primary hover:underline">View All</button>
-                    </div>
-                    <div className="p-6">
-                        <div className="space-y-6">
-                            {[1, 2, 3].map((i) => (
-                                <div key={i} className="flex items-start gap-4">
-                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                        <Users className="h-5 w-5" />
-                                    </div>
-                                    <div className="space-y-1 flex-1">
-                                        <div className="flex items-center justify-between">
-                                            <p className="text-sm font-medium leading-none">Potential Buyer {i}</p>
-                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
-                                                <Clock className="h-3 w-3" /> 2h ago
-                                            </span>
-                                        </div>
-                                        <p className="text-sm text-muted-foreground line-clamp-1">Interested in 3BHK Villa at Emerald Greens, budget around 1.5 Cr...</p>
-                                        <div className="flex gap-2 mt-2">
-                                            <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">New Lead</span>
-                                            <span className="inline-flex items-center rounded-md bg-gray-50 px-2 py-1 text-xs font-medium text-gray-600 ring-1 ring-inset ring-gray-500/10">3BHK</span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Project Status */}
-                <div className="col-span-3 space-y-6">
-                    <div className="rounded-2xl border bg-card shadow-sm h-full">
-                        <div className="flex items-center justify-between border-b p-6">
-                            <h3 className="font-semibold leading-none tracking-tight">Project Milestones</h3>
-                        </div>
-                        <div className="p-6 space-y-6">
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                    <div className="flex items-center gap-2 font-medium">
-                                        <Building className="h-4 w-4 text-blue-500" />
-                                        Lakshmi Nivas
-                                    </div>
-                                    <span className="text-muted-foreground">92%</span>
-                                </div>
-                                <div className="h-2 rounded-full bg-secondary">
-                                    <div className="h-full w-[92%] rounded-full bg-blue-600"></div>
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                    <div className="flex items-center gap-2 font-medium">
-                                        <Building className="h-4 w-4 text-amber-500" />
-                                        Varnasi Layout
-                                    </div>
-                                    <span className="text-muted-foreground">45%</span>
-                                </div>
-                                <div className="h-2 rounded-full bg-secondary">
-                                    <div className="h-full w-[45%] rounded-full bg-amber-500"></div>
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between text-sm">
-                                    <div className="flex items-center gap-2 font-medium">
-                                        <Building className="h-4 w-4 text-emerald-500" />
-                                        Sunrise Towers
-                                    </div>
-                                    <span className="text-muted-foreground">12%</span>
-                                </div>
-                                <div className="h-2 rounded-full bg-secondary">
-                                    <div className="h-full w-[12%] rounded-full bg-emerald-500"></div>
-                                </div>
-                            </div>
-
-                            <div className="mt-8 rounded-xl bg-slate-900 p-4 text-white">
-                                <div className="flex items-center gap-3">
-                                    <div className="rounded-lg bg-white/10 p-2">
-                                        <Star className="h-5 w-5 text-yellow-400 fill-yellow-400" />
-                                    </div>
-                                    <div>
-                                        <p className="text-sm font-medium">Top Performer</p>
-                                        <p className="text-xs text-slate-400">Sales Person: Sarah J.</p>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+            <div className="text-center text-sm text-muted-foreground py-8">
+                Dashboard updated with real-time data. {totalRevenue === 0 && "No data available (System Reset)."}
             </div>
         </div>
     )

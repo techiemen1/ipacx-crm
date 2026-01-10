@@ -1,8 +1,6 @@
-import { PrismaClient } from '@prisma/client'
+import { prisma } from "@/lib/prisma"
 import { InvoiceView } from '@/components/admin/invoice-view'
 import { notFound } from 'next/navigation'
-
-const prisma = new PrismaClient()
 
 interface ViewInvoicePageProps {
     params: Promise<{

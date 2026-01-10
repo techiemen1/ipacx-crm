@@ -1,10 +1,8 @@
-import { PrismaClient } from '@prisma/client'
+import { prisma } from "@/lib/prisma"
 import { InvoiceList } from '@/components/admin/invoice-list'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
 import { Plus } from 'lucide-react'
-
-const prisma = new PrismaClient()
 
 export default async function InvoicesPage() {
     const invoices = await prisma.invoice.findMany({

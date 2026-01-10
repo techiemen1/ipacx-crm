@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button"
 
 import { DownloadReportButton } from "@/components/admin/download-report-button"
 
+export const dynamic = 'force-dynamic'
+
 export default async function AccountsPage() {
     const invoices = await prisma.invoice.findMany({
         orderBy: { issuedDate: 'desc' },

@@ -630,111 +630,88 @@ export async function logoutAction() {
 // --- Danger Zone ---
 
 export async function resetApplicationData() {
-    // Check if user is admin - simplified check, assuming this action is only called by authorized users
-    // Ideally we should check session role here
+    // Check if user is admin
     const session = await auth()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     if ((session?.user as any)?.role !== "ADMIN") return { error: "Unauthorized" }
 
     try {
-        // SQLite "Nuclear" Reset - Bypass FKs temporarily to forcefully clear data
-        await prisma.$executeRawUnsafe("PRAGMA foreign_keys = OFF;")
+        await prisma.$transaction(async (tx) => {
+            // SQLite "Nuclear" Reset - Bypass FKs on THIS transaction connection
+            await tx.$executeRawUnsafe("PRAGMA foreign_keys = OFF;")
+            console.log("Reset: Cleaning Data...")
 
-        await prisma.$transaction([
-            prisma.billAllocation.deleteMany(),
-            prisma.voucherEntry.deleteMany(),
-            prisma.voucher.deleteMany(),
-            prisma.stockMovement.deleteMany(),
-            prisma.stockJournal.deleteMany(),
-            prisma.inventoryStock.deleteMany(),
-            prisma.inventoryBatch.deleteMany(),
-            prisma.productionOrder.deleteMany(),
-            prisma.bOMComponent.deleteMany(),
-            prisma.billOfMaterial.deleteMany(),
-            prisma.payment.deleteMany(),
-            prisma.invoiceItem.deleteMany(),
-            prisma.invoice.deleteMany(),
-            prisma.expense.deleteMany(),
-            prisma.activity.deleteMany(),
-            prisma.cRMContact.deleteMany(),
-            prisma.cRMDeal.deleteMany(),
-            prisma.task.deleteMany(),
-            prisma.hRLeaveRequest.deleteMany(),
-            prisma.hRLeaveBalance.deleteMany(),
-            prisma.attendance.deleteMany(),
-            prisma.payslip.deleteMany(),
-            prisma.communicationLog.deleteMany(),
-            prisma.internalLog.deleteMany(),
-            prisma.costCenter.deleteMany(),
-            prisma.property.deleteMany(),
-            prisma.inventoryItem.deleteMany(),
-            prisma.vendor.deleteMany(),
-            prisma.customer.deleteMany(),
-            prisma.project.deleteMany(),
-            await prisma.$transaction(async (tx) => {
-                await tx.billAllocation.deleteMany(),
-                    await tx.voucherEntry.deleteMany(),
-                    await tx.voucher.deleteMany(),
-                    await tx.stockMovement.deleteMany(),
-                    await tx.stockJournal.deleteMany(),
-                    await tx.inventoryStock.deleteMany(),
-                    await tx.inventoryBatch.deleteMany(),
-                    await tx.productionOrder.deleteMany(),
-                    await tx.bOMComponent.deleteMany(),
-                    await tx.billOfMaterial.deleteMany(),
-                    await tx.payment.deleteMany(),
-                    await tx.invoiceItem.deleteMany(),
-                    await tx.invoice.deleteMany(),
-                    await tx.expense.deleteMany(),
-                    await tx.activity.deleteMany(),
-                    await tx.cRMContact.deleteMany(),
-                    await tx.cRMDeal.deleteMany(),
-                    await tx.task.deleteMany(),
-                    await tx.hRLeaveRequest.deleteMany(),
-                    await tx.hRLeaveBalance.deleteMany(),
-                    await tx.attendance.deleteMany(),
-                    await tx.payslip.deleteMany(),
-                    await tx.communicationLog.deleteMany(),
-                    await tx.internalLog.deleteMany(),
-                    await tx.costCenter.deleteMany(),
-                    await tx.property.deleteMany(),
-                    await tx.inventoryItem.deleteMany(),
-                    await tx.vendor.deleteMany(),
-                    await tx.customer.deleteMany(),
-                    await tx.project.deleteMany(),
-                    await tx.companyProfile.deleteMany(),
-                    await tx.bankAccount.deleteMany(),
-                    await tx.accountHead.deleteMany(),
-                    await tx.accountGroup.deleteMany(),
-            // Optional: Keep Admin User
-            // prisma.user.deleteMany({ where: { role: { not: "ADMIN" } } })
+            // Delete everything in reverse order of dependency (loosely) 
+            // though with FKs = OFF it technically doesn't matter, but it's good practice.
+            // Using tx.model.deleteMany() is cleaner than raw SQL where possible, 
+            // but for reset we want speed and certainty.
 
-            // As requested: Delete Employees and Users (except Admin)
+            // Core Business Data
+            await tx.billAllocation.deleteMany()
+            await tx.voucherEntry.deleteMany()
+            await tx.voucher.deleteMany()
+            await tx.stockMovement.deleteMany()
+            await tx.stockJournal.deleteMany()
+            await tx.inventoryStock.deleteMany()
+            await tx.inventoryBatch.deleteMany()
+            await tx.productionOrder.deleteMany()
+            await tx.bOMComponent.deleteMany()
+            await tx.billOfMaterial.deleteMany()
+
+            // Sales/Purchases
+            await tx.payment.deleteMany()
+            await tx.invoiceItem.deleteMany()
+            await tx.invoice.deleteMany()
+            await tx.expense.deleteMany()
+
+            // CRM
+            await tx.activity.deleteMany()
+            await tx.cRMContact.deleteMany()
+            await tx.cRMDeal.deleteMany()
+
+            // HR & Tasks
+            await tx.task.deleteMany()
+            await tx.hRLeaveRequest.deleteMany()
+            await tx.hRLeaveBalance.deleteMany()
+            await tx.attendance.deleteMany()
+            await tx.payslip.deleteMany()
+
+            // Logs
+            await tx.communicationLog.deleteMany()
+            await tx.internalLog.deleteMany()
+
+            // Master Data
+            await tx.costCenter.deleteMany()
+            await tx.property.deleteMany()
+            await tx.inventoryItem.deleteMany()
+            await tx.vendor.deleteMany()
+            await tx.customer.deleteMany()
+            await tx.project.deleteMany()
+            await tx.companyProfile.deleteMany()
+            await tx.bankAccount.deleteMany()
+            await tx.accountHead.deleteMany()
+            await tx.accountGroup.deleteMany()
+
+            // Users & Employees (Raw SQL to handle potential schema variations and force delete)
             try {
-                    await tx.$executeRawUnsafe('DELETE FROM "Employee";')
-                    await tx.$executeRawUnsafe('DELETE FROM "UserProfile";')
-                    await tx.$executeRawUnsafe('DELETE FROM "User" WHERE role != \'ADMIN\';')
-                } catch (err) {
-                    console.warn("Reset: Skipped User/Employee deletion due to schema mismatch", err)
-                }
+                await tx.$executeRawUnsafe('DELETE FROM "Employee";')
+                await tx.$executeRawUnsafe('DELETE FROM "UserProfile";')
+                await tx.$executeRawUnsafe('DELETE FROM "User" WHERE role != \'ADMIN\';')
+            } catch (err) {
+                console.warn("Reset: Skipped User/Employee deletion due to schema mismatch", err)
+            }
 
-                // Re-enable FKs
-                await tx.$executeRawUnsafe("PRAGMA foreign_keys = ON;")
-            })
+            // Re-enable FKs
+            await tx.$executeRawUnsafe("PRAGMA foreign_keys = ON;")
+        }, {
+            timeout: 20000,
+            maxWait: 5000
+        })
 
         revalidatePath("/", "layout")
         return { success: true }
     } catch (e: any) {
         console.error("Hard Reset Failed:", e)
-        // Ensure FKs are back on even if fail
-        try { await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON;") } catch { }
         return { error: `Failed to reset data: ${e.message}` }
     }
-
-    revalidatePath("/", "layout")
-    return { success: true }
-} catch (e) {
-    console.error(e)
-    return { error: "Failed to reset data" }
-}
 }

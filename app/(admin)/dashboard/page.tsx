@@ -177,7 +177,7 @@ export default async function DashboardPage() {
                                     </div>
                                     <div className="space-y-1 flex-1">
                                         <div className="flex items-center justify-between">
-                                            <p className="text-sm font-medium leading-none">{lead.companyName || lead.name}</p>
+                                            <p className="text-sm font-medium leading-none">{lead.name}</p>
                                             <span className="text-xs text-muted-foreground flex items-center gap-1">
                                                 <Clock className="h-3 w-3" /> {new Date(lead.createdAt).toLocaleDateString()}
                                             </span>
@@ -229,6 +229,8 @@ export default async function DashboardPage() {
 
             <div className="text-center text-sm text-muted-foreground py-8">
                 Dashboard updated with real-time data. {totalRevenue === 0 && "No data available (System Reset)."}
+                <br />
+                <span className="text-xs opacity-50">Last Refreshed: {new Date().toLocaleTimeString()}</span>
             </div>
         </div>
     )

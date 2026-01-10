@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache"
 import { userSchema, customerSchema, invoiceSchema } from "./schemas"
 import { hash } from "bcryptjs"
 import { redirect } from "next/navigation"
+import { sendEmail } from "./mail"
 
 // --- Auth Actions ---
 
@@ -713,5 +714,79 @@ export async function resetApplicationData() {
     } catch (e: any) {
         console.error("Hard Reset Failed:", e)
         return { error: `Failed to reset data: ${e.message}` }
+    }
+}
+
+// --- Communication ---
+
+export async function sendEmployeeBroadcast(formData: FormData) {
+    const session = await auth()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if ((session?.user as any)?.role !== "ADMIN") return { error: "Unauthorized" }
+
+    const subject = formData.get("subject") as string
+    const message = formData.get("message") as string
+    const targetType = formData.get("targetType") as string // "ALL", "DEPARTMENT", "EMPLOYEE"
+    const targetId = formData.get("targetId") as string // For department
+    const targetIdEmp = formData.get("targetId_emp") as string // For employee
+
+    // Determine actual target ID based on type
+    const finalTargetId = targetType === "DEPARTMENT" ? targetId : (targetType === "EMPLOYEE" ? targetIdEmp : null)
+
+    if (!subject || !message) return { error: "Subject and message are required" }
+
+    try {
+        let employees: { email: string | null; firstName: string }[] = []
+
+        if (targetType === "ALL") {
+            employees = await prisma.employee.findMany({
+                where: { status: "Active", email: { not: null } },
+                select: { email: true, firstName: true }
+            })
+        } else if (targetType === "DEPARTMENT" && finalTargetId) {
+            employees = await prisma.employee.findMany({
+                where: { status: "Active", email: { not: null }, departmentId: finalTargetId },
+                select: { email: true, firstName: true }
+            })
+        } else if (targetType === "EMPLOYEE" && finalTargetId) {
+            const emp = await prisma.employee.findUnique({
+                where: { id: finalTargetId },
+                select: { email: true, firstName: true }
+            })
+            if (emp) employees = [emp]
+        }
+
+        if (employees.length === 0) return { error: "No valid recipients found" }
+
+        // Send Emails in parallel
+        let sentCount = 0
+        await Promise.all(employees.map(async (emp) => {
+            if (emp.email) {
+                await sendEmail({
+                    to: emp.email,
+                    subject: subject,
+                    html: `<p>Dear ${emp.firstName},</p>${message}<p><br>Best regards,<br>Admin Team</p>`
+                })
+                sentCount++
+            }
+        }))
+
+        // Log the activity
+        await prisma.communicationLog.create({
+            data: {
+                subject,
+                body: message,
+                recipientType: targetType,
+                recipientId: finalTargetId || "ALL",
+                status: "Sent",
+                sentBy: session?.user?.name || "Admin",
+            }
+        })
+
+        revalidatePath("/admin/communications")
+        return { success: true, count: sentCount }
+    } catch (error: any) {
+        console.error("Broadcast Failed:", error)
+        return { error: error.message }
     }
 }

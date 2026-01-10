@@ -671,15 +671,56 @@ export async function resetApplicationData() {
             prisma.vendor.deleteMany(),
             prisma.customer.deleteMany(),
             prisma.project.deleteMany(),
-            prisma.companyProfile.deleteMany(),
-            prisma.bankAccount.deleteMany(),
-            prisma.accountHead.deleteMany(),
-            prisma.accountGroup.deleteMany(),
+            await prisma.$transaction(async (tx) => {
+                await tx.billAllocation.deleteMany(),
+                    await tx.voucherEntry.deleteMany(),
+                    await tx.voucher.deleteMany(),
+                    await tx.stockMovement.deleteMany(),
+                    await tx.stockJournal.deleteMany(),
+                    await tx.inventoryStock.deleteMany(),
+                    await tx.inventoryBatch.deleteMany(),
+                    await tx.productionOrder.deleteMany(),
+                    await tx.bOMComponent.deleteMany(),
+                    await tx.billOfMaterial.deleteMany(),
+                    await tx.payment.deleteMany(),
+                    await tx.invoiceItem.deleteMany(),
+                    await tx.invoice.deleteMany(),
+                    await tx.expense.deleteMany(),
+                    await tx.activity.deleteMany(),
+                    await tx.cRMContact.deleteMany(),
+                    await tx.cRMDeal.deleteMany(),
+                    await tx.task.deleteMany(),
+                    await tx.hRLeaveRequest.deleteMany(),
+                    await tx.hRLeaveBalance.deleteMany(),
+                    await tx.attendance.deleteMany(),
+                    await tx.payslip.deleteMany(),
+                    await tx.communicationLog.deleteMany(),
+                    await tx.internalLog.deleteMany(),
+                    await tx.costCenter.deleteMany(),
+                    await tx.property.deleteMany(),
+                    await tx.inventoryItem.deleteMany(),
+                    await tx.vendor.deleteMany(),
+                    await tx.customer.deleteMany(),
+                    await tx.project.deleteMany(),
+                    await tx.companyProfile.deleteMany(),
+                    await tx.bankAccount.deleteMany(),
+                    await tx.accountHead.deleteMany(),
+                    await tx.accountGroup.deleteMany(),
             // Optional: Keep Admin User
             // prisma.user.deleteMany({ where: { role: { not: "ADMIN" } } })
-        ])
 
-        await prisma.$executeRawUnsafe("PRAGMA foreign_keys = ON;")
+            // As requested: Delete Employees and Users (except Admin)
+            try {
+                    await tx.$executeRawUnsafe('DELETE FROM "Employee";')
+                    await tx.$executeRawUnsafe('DELETE FROM "UserProfile";')
+                    await tx.$executeRawUnsafe('DELETE FROM "User" WHERE role != \'ADMIN\';')
+                } catch (err) {
+                    console.warn("Reset: Skipped User/Employee deletion due to schema mismatch", err)
+                }
+
+                // Re-enable FKs
+                await tx.$executeRawUnsafe("PRAGMA foreign_keys = ON;")
+            })
 
         revalidatePath("/", "layout")
         return { success: true }

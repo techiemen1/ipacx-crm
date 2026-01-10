@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 
 export default async function DashboardPage() {
 
-    // Fetch real data
+    // 1. Key Metrics
     const totalRevenueAgg = await prisma.invoice.aggregate({
         where: { status: 'Paid' },
         _sum: { totalAmount: true }
@@ -18,14 +18,32 @@ export default async function DashboardPage() {
         where: { status: 'Lead' }
     })
 
-    // Assuming Properties Sold = Invoices for Project/Property or just Deals won
     const propertiesSold = await prisma.cRMDeal.count({
         where: { status: 'Won' }
     })
 
-    // Site Visits from Activities
     const siteVisits = await prisma.activity.count({
         where: { type: 'Site Visit' }
+    })
+
+    // 2. Recent Leads (Inquiries)
+    const recentLeads = await prisma.customer.findMany({
+        where: { status: 'Lead' },
+        take: 3,
+        orderBy: { createdAt: 'desc' }
+    })
+
+    // 3. Projects (Milestones)
+    const projects = await prisma.project.findMany({
+        take: 3,
+        orderBy: { updatedAt: 'desc' },
+        select: {
+            id: true,
+            name: true,
+            unitsTotal: true,
+            unitsSold: true,
+            type: true
+        }
     })
 
     const stats = [
@@ -135,6 +153,78 @@ export default async function DashboardPage() {
                         </div>
                     </div>
                 ))}
+            </div>
+
+            {/* Main Content Grid & Projects */}
+            <div className="grid gap-6 md:grid-cols-7">
+                {/* Recent Leads Feed */}
+                <div className="col-span-4 rounded-2xl border bg-card shadow-sm">
+                    <div className="flex items-center justify-between border-b p-6">
+                        <div className="space-y-1">
+                            <h3 className="font-semibold leading-none tracking-tight">Recent Inquiries</h3>
+                            <p className="text-sm text-muted-foreground">Latest leads from all sources</p>
+                        </div>
+                        <Link href="/admin/crm" className="text-xs font-medium text-primary hover:underline">View All</Link>
+                    </div>
+                    <div className="p-6">
+                        <div className="space-y-6">
+                            {recentLeads.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-4">No recent inquiries to show.</p>
+                            ) : recentLeads.map((lead) => (
+                                <div key={lead.id} className="flex items-start gap-4">
+                                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                        <Users className="h-5 w-5" />
+                                    </div>
+                                    <div className="space-y-1 flex-1">
+                                        <div className="flex items-center justify-between">
+                                            <p className="text-sm font-medium leading-none">{lead.companyName || lead.name}</p>
+                                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                                                <Clock className="h-3 w-3" /> {new Date(lead.createdAt).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                        {lead.email && <p className="text-sm text-muted-foreground line-clamp-1">{lead.email}</p>}
+                                        <div className="flex gap-2 mt-2">
+                                            <span className="inline-flex items-center rounded-md bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 ring-1 ring-inset ring-blue-700/10">New Lead</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                </div>
+
+                {/* Project Status */}
+                <div className="col-span-3 space-y-6">
+                    <div className="rounded-2xl border bg-card shadow-sm h-full">
+                        <div className="flex items-center justify-between border-b p-6">
+                            <h3 className="font-semibold leading-none tracking-tight">Project Milestones</h3>
+                        </div>
+                        <div className="p-6 space-y-6">
+                            {projects.length === 0 ? (
+                                <p className="text-sm text-muted-foreground text-center py-4">No projects started yet.</p>
+                            ) : projects.map((project) => {
+                                const percent = project.unitsTotal > 0 ? Math.round((project.unitsSold / project.unitsTotal) * 100) : 0
+                                return (
+                                    <div key={project.id} className="space-y-2">
+                                        <div className="flex items-center justify-between text-sm">
+                                            <div className="flex items-center gap-2 font-medium">
+                                                <Building className="h-4 w-4 text-blue-500" />
+                                                {project.name}
+                                            </div>
+                                            <span className="text-muted-foreground">{percent}% Sold</span>
+                                        </div>
+                                        <div className="h-2 rounded-full bg-secondary">
+                                            <div
+                                                className="h-full rounded-full bg-blue-600"
+                                                style={{ width: `${percent}%` }}
+                                            ></div>
+                                        </div>
+                                    </div>
+                                )
+                            })}
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div className="text-center text-sm text-muted-foreground py-8">

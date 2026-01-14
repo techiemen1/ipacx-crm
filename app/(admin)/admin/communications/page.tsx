@@ -21,6 +21,11 @@ export default async function CommunicationsPage() {
         take: 10
     })
 
+    async function handleBroadcastWrapper(formData: FormData) {
+        "use server"
+        await sendEmployeeBroadcast(formData)
+    }
+
     return (
         <div className="space-y-6">
             <h1 className="text-3xl font-bold tracking-tight">Communications Center</h1>
@@ -36,7 +41,7 @@ export default async function CommunicationsPage() {
                         <CardDescription>Send email notifications to your team.</CardDescription>
                     </CardHeader>
                     <CardContent>
-                        <form action={sendEmployeeBroadcast} className="space-y-4">
+                        <form action={handleBroadcastWrapper} className="space-y-4">
                             <div className="space-y-2">
                                 <Label>Target Audience</Label>
                                 <Select name="targetType" defaultValue="ALL">

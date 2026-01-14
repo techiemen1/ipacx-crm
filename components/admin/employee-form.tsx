@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import * as z from "zod"
-import { createEmployee } from "@/lib/hr-actions"
+import { createEmployee, updateEmployee } from "@/lib/hr-actions"
 import { Button } from "@/components/ui/button"
 import {
     Form,
@@ -49,15 +49,33 @@ interface EmployeeFormProps {
     departments: any[]
     designations: any[]
     shifts: any[]
+    initialData?: any
 }
 
-export function EmployeeForm({ departments, designations, shifts }: EmployeeFormProps) {
+export function EmployeeForm({ departments, designations, shifts, initialData }: EmployeeFormProps) {
     const [loading, setLoading] = useState(false)
     const router = useRouter()
 
     const form = useForm<z.infer<typeof formSchema>>({
         resolver: zodResolver(formSchema),
-        defaultValues: {
+        defaultValues: initialData ? {
+            firstName: initialData.firstName,
+            lastName: initialData.lastName,
+            email: initialData.email,
+            phone: initialData.phone || "",
+            departmentId: initialData.departmentId || "",
+            designationId: initialData.designationId || "",
+            shiftId: initialData.shiftId || "",
+            joinDate: initialData.joinDate ? new Date(initialData.joinDate).toISOString().split('T')[0] : "",
+            pan: initialData.pan || "",
+            aadhar: initialData.aadhar || "",
+            uan: initialData.uan || "",
+            pfNumber: initialData.pfNumber || "",
+            esiNumber: initialData.esiNumber || "",
+            bankName: initialData.bankName || "",
+            accountNumber: initialData.accountNumber || "",
+            ifsc: initialData.ifsc || ""
+        } : {
             firstName: "", lastName: "", email: "", phone: "",
             departmentId: "", designationId: "", shiftId: "",
             joinDate: new Date().toISOString().split('T')[0],
@@ -68,16 +86,24 @@ export function EmployeeForm({ departments, designations, shifts }: EmployeeForm
 
     async function onSubmit(values: z.infer<typeof formSchema>) {
         setLoading(true)
-        const result = await createEmployee({
-            ...values,
-            joinDate: new Date(values.joinDate)
-        })
+        let result
+        if (initialData) {
+            result = await updateEmployee(initialData.id, {
+                ...values,
+                joinDate: new Date(values.joinDate)
+            })
+        } else {
+            result = await createEmployee({
+                ...values,
+                joinDate: new Date(values.joinDate)
+            })
+        }
         setLoading(false)
 
         if (result.error) {
             toast.error(result.error)
         } else {
-            toast.success("Employee onboarding complete")
+            toast.success(initialData ? "Employee updated" : "Employee onboarding complete")
             router.push("/admin/hr/employees")
             router.refresh()
         }

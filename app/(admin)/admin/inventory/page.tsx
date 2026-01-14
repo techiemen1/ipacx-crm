@@ -44,7 +44,7 @@ export default async function InventoryPage() {
             <div className="grid gap-4 md:grid-cols-4">
                 <div role="button" className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 hover:bg-muted/50 transition-colors">
                     <h3 className="font-semibold mb-2">Total Value</h3>
-                    <div className="text-2xl font-bold">₹12.5L</div>
+                    <div className="text-2xl font-bold">₹0</div>
                 </div>
                 <Link href="/admin/inventory/items" className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 hover:bg-muted/50 transition-colors">
                     <h3 className="font-semibold mb-2">Items & Groups</h3>
@@ -65,6 +65,6 @@ export default async function InventoryPage() {
             </div>
 
             <InventoryManagement initialItems={items} />
-        </div>
+        </div >
     )
 }

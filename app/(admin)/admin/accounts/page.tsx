@@ -9,6 +9,51 @@ import { DownloadReportButton } from "@/components/admin/download-report-button"
 export const dynamic = 'force-dynamic'
 
 export default async function AccountsPage() {
+    // Fetch Data for Metrics
+    const today = new Date()
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
+
+    // 1. GST Liability (Tax collected but maybe not paid to govt, conceptually. Simpler: Tax on Unpaid/Partial Invoices)
+    // Or better: Total Tax collected this month? User said "GST Liability 1.2L", could be total tax payable.
+    // Let's go with: Tax Amount on ALL invoices (liability to govt) - Input Tax Credit (not tracked yet). 
+    // For simplicity & "reset" proof: Sum of taxAmount on ALL invoices for now.
+    const gstLiabilityAgg = await prisma.invoice.aggregate({
+        _sum: { taxAmount: true }
+    })
+    const gstLiability = gstLiabilityAgg._sum.taxAmount || 0
+
+    // 2. Payroll (Current Month)
+    const payrollAgg = await prisma.payslip.aggregate({
+        where: {
+            month: today.getMonth() + 1,
+            year: today.getFullYear()
+        },
+        _sum: { netSalary: true }
+    })
+    const payrollTotal = payrollAgg._sum.netSalary || 0
+
+    // 3. Site Expenses (Current Month)
+    const expensesAgg = await prisma.expense.aggregate({
+        where: {
+            date: { gte: firstDayOfMonth }
+        },
+        _sum: { amount: true }
+    })
+    const siteExpenses = expensesAgg._sum.amount || 0
+
+    // 4. Net Cash Flow (Total Revenue - Total Expense)
+    // Revenue = Paid Invoices
+    const revenueAgg = await prisma.invoice.aggregate({
+        where: { paymentStatus: 'Paid' },
+        _sum: { totalAmount: true }
+    })
+    const totalRevenue = revenueAgg._sum.totalAmount || 0
+    // Total Expense includes Site Expenses + Payroll (approx cashflow)
+    // For now, let's use Site Expenses + Payroll as "Outflow"
+    const totalOutflow = siteExpenses + payrollTotal
+    const netCashFlow = totalRevenue - totalOutflow
+
+
     const invoices = await prisma.invoice.findMany({
         orderBy: { issuedDate: 'desc' },
         take: 10,
@@ -16,6 +61,14 @@ export default async function AccountsPage() {
             customer: true
         }
     })
+
+    const formatCurrency = (amount: number) => {
+        return new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            maximumFractionDigits: 0
+        }).format(amount)
+    }
 
     return (
         <div className="space-y-6">
@@ -37,23 +90,23 @@ export default async function AccountsPage() {
                         <h3 className="tracking-tight text-sm font-medium text-muted-foreground">GST Liability</h3>
                         <PieChart className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div className="text-2xl font-bold">₹1.2L</div>
-                    <p className="text-xs text-muted-foreground">Input Credit: ₹45k</p>
+                    <div className="text-2xl font-bold">{formatCurrency(gstLiability)}</div>
+                    <p className="text-xs text-muted-foreground">Total Tax Collected</p>
                 </Link>
                 <Link href="/admin/accounts/payroll" className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 hover:bg-muted/50 transition-colors">
                     <div className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <h3 className="tracking-tight text-sm font-medium text-muted-foreground">Payroll (Jan)</h3>
+                        <h3 className="tracking-tight text-sm font-medium text-muted-foreground">Payroll (This Month)</h3>
                         <UsersIcon className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div className="text-2xl font-bold">₹4.5L</div>
-                    <p className="text-xs text-muted-foreground">Due in 5 days</p>
+                    <div className="text-2xl font-bold">{formatCurrency(payrollTotal)}</div>
+                    <p className="text-xs text-muted-foreground">Generated Payslips</p>
                 </Link>
                 <Link href="/admin/accounts/expenses" className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 hover:bg-muted/50 transition-colors">
                     <div className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <h3 className="tracking-tight text-sm font-medium text-muted-foreground">Site Expenses</h3>
                         <TrendingUp className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div className="text-2xl font-bold">₹85k</div>
+                    <div className="text-2xl font-bold">{formatCurrency(siteExpenses)}</div>
                     <p className="text-xs text-muted-foreground">This Month</p>
                 </Link>
 
@@ -63,8 +116,10 @@ export default async function AccountsPage() {
                         <h3 className="tracking-tight text-sm font-medium text-muted-foreground">Net Cashflow</h3>
                         <IndianRupee className="h-4 w-4 text-muted-foreground" />
                     </div>
-                    <div className="text-2xl font-bold text-green-600">+₹12.5L</div>
-                    <p className="text-xs text-muted-foreground">Healthy</p>
+                    <div className={`text-2xl font-bold ${netCashFlow >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {netCashFlow > 0 ? "+" : ""}{formatCurrency(netCashFlow)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Revenue - (Expenses + Payroll)</p>
                 </div>
                 <Link href="/admin/accounts/vouchers" className="rounded-xl border bg-card text-card-foreground shadow-sm p-6 hover:bg-muted/50 transition-colors">
                     <div className="flex flex-row items-center justify-between space-y-0 pb-2">

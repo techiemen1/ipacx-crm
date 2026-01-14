@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { toast } from "sonner"
 import { createPayHead, createDepartment, createDesignation } from "@/lib/hr-actions"
 import { useRouter } from "next/navigation"
+import { Trash2 } from "lucide-react"
 
 interface PayrollSetupProps {
     payHeads: any[]
@@ -93,17 +94,65 @@ export default function PayrollSetup({ payHeads, departments, designations, shif
                         </div>
 
                         <div className="grid grid-cols-2 gap-4 mt-4">
-                            <div>
-                                <h4 className="font-semibold mb-2">Departments</h4>
-                                <ul className="list-disc pl-4 text-sm text-muted-foreground">
-                                    {departments.map(d => <li key={d.id}>{d.name}</li>)}
-                                </ul>
+                            <div className="border rounded-md p-4">
+                                <h4 className="font-semibold mb-2 text-sm text-foreground">Departments ({departments.length})</h4>
+                                {departments.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground italic">No departments added.</p>
+                                ) : (
+                                    <ul className="space-y-2">
+                                        {departments.map(d => (
+                                            <li key={d.id} className="flex items-center justify-between text-sm bg-muted/40 p-2 rounded-md group">
+                                                <span>{d.name}</span>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    onClick={async () => {
+                                                        const m = await import("@/lib/hr-actions")
+                                                        const res = await m.deleteDepartment(d.id)
+                                                        if (res.error) toast.error(res.error)
+                                                        else {
+                                                            toast.success("Department deleted")
+                                                            router.refresh()
+                                                        }
+                                                    }}
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
-                            <div>
-                                <h4 className="font-semibold mb-2">Designations</h4>
-                                <ul className="list-disc pl-4 text-sm text-muted-foreground">
-                                    {designations.map(d => <li key={d.id}>{d.name}</li>)}
-                                </ul>
+                            <div className="border rounded-md p-4">
+                                <h4 className="font-semibold mb-2 text-sm text-foreground">Designations ({designations.length})</h4>
+                                {designations.length === 0 ? (
+                                    <p className="text-xs text-muted-foreground italic">No designations added.</p>
+                                ) : (
+                                    <ul className="space-y-2">
+                                        {designations.map(d => (
+                                            <li key={d.id} className="flex items-center justify-between text-sm bg-muted/40 p-2 rounded-md group">
+                                                <span>{d.name}</span>
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    className="h-6 w-6 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    onClick={async () => {
+                                                        const m = await import("@/lib/hr-actions")
+                                                        const res = await m.deleteDesignation(d.id)
+                                                        if (res.error) toast.error(res.error)
+                                                        else {
+                                                            toast.success("Designation deleted")
+                                                            router.refresh()
+                                                        }
+                                                    }}
+                                                >
+                                                    <Trash2 className="h-3 w-3" />
+                                                </Button>
+                                            </li>
+                                        ))}
+                                    </ul>
+                                )}
                             </div>
                         </div>
                     </CardContent>

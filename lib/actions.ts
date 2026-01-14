@@ -642,11 +642,6 @@ export async function resetApplicationData() {
             await tx.$executeRawUnsafe("PRAGMA foreign_keys = OFF;")
             console.log("Reset: Cleaning Data...")
 
-            // Delete everything in reverse order of dependency (loosely) 
-            // though with FKs = OFF it technically doesn't matter, but it's good practice.
-            // Using tx.model.deleteMany() is cleaner than raw SQL where possible, 
-            // but for reset we want speed and certainty.
-
             // Core Business Data
             await tx.billAllocation.deleteMany()
             await tx.voucherEntry.deleteMany()
@@ -658,6 +653,13 @@ export async function resetApplicationData() {
             await tx.productionOrder.deleteMany()
             await tx.bOMComponent.deleteMany()
             await tx.billOfMaterial.deleteMany()
+            await tx.inventoryItem.deleteMany() // Moved here
+
+            // Banking
+            await tx.bankStatementLine.deleteMany()
+            await tx.chequeLeaf.deleteMany()
+            await tx.chequeBook.deleteMany()
+            await tx.bankAccount.deleteMany()
 
             // Sales/Purchases
             await tx.payment.deleteMany()
@@ -669,6 +671,8 @@ export async function resetApplicationData() {
             await tx.activity.deleteMany()
             await tx.cRMContact.deleteMany()
             await tx.cRMDeal.deleteMany()
+            await tx.cRMStage.deleteMany()
+            await tx.cRMPipeline.deleteMany()
 
             // HR & Tasks
             await tx.task.deleteMany()
@@ -676,6 +680,15 @@ export async function resetApplicationData() {
             await tx.hRLeaveBalance.deleteMany()
             await tx.attendance.deleteMany()
             await tx.payslip.deleteMany()
+            await tx.employeePayHead.deleteMany()
+            await tx.employee.deleteMany() // Using Prisma method is safer if possible, but raw might be needed for cyclic dependencies if Foreign Keys were ON. With FK OFF, this is fine.
+
+            // HR Config
+            await tx.hRDepartment.deleteMany()
+            await tx.hRDesignation.deleteMany()
+            await tx.hRPayHead.deleteMany()
+            await tx.hRShift.deleteMany()
+            await tx.hRLeaveType.deleteMany()
 
             // Logs
             await tx.communicationLog.deleteMany()
@@ -684,28 +697,44 @@ export async function resetApplicationData() {
             // Master Data
             await tx.costCenter.deleteMany()
             await tx.property.deleteMany()
-            await tx.inventoryItem.deleteMany()
+            // inventoryItem deleted above
+            await tx.inventoryGroup.deleteMany()
+            await tx.uomConversion.deleteMany()
+            await tx.unitOfMeasure.deleteMany()
+            await tx.warehouse.deleteMany()
             await tx.vendor.deleteMany()
             await tx.customer.deleteMany()
             await tx.project.deleteMany()
             await tx.companyProfile.deleteMany()
-            await tx.bankAccount.deleteMany()
             await tx.accountHead.deleteMany()
             await tx.accountGroup.deleteMany()
+            await tx.taxRate.deleteMany()
+            await tx.appConfig.deleteMany()
 
-            // Users & Employees (Raw SQL to handle potential schema variations and force delete)
-            try {
-                await tx.$executeRawUnsafe('DELETE FROM "Employee";')
-                await tx.$executeRawUnsafe('DELETE FROM "UserProfile";')
-                await tx.$executeRawUnsafe('DELETE FROM "User" WHERE role != \'ADMIN\';')
-            } catch (err) {
-                console.warn("Reset: Skipped User/Employee deletion due to schema mismatch", err)
-            }
+            // Users & Access Control
+            // We want to keep the CURRENT Admin user, or at least one admin.
+            // But usually "Reset App Data" keeps users? 
+            // The prompt said "not deleted" implying they wanted it deleted? 
+            // "reset application data not deleted . how to wipe full ?"
+            // Usually Application Data implies business transactions. Wiping users might lock them out.
+            // I will wipe ALL users except the one currently logged in (or all admins).
+
+            // Let's wipe non-admin users and profiles
+            await tx.userRole.deleteMany()
+            await tx.role.deleteMany()
+            await tx.userProfile.deleteMany()
+
+            // Delete all users except ADMINs to prevent lockout
+            await tx.user.deleteMany({
+                where: { role: { not: 'ADMIN' } }
+            })
+
+            console.log("Reset: Data cleaned.")
 
             // Re-enable FKs
             await tx.$executeRawUnsafe("PRAGMA foreign_keys = ON;")
         }, {
-            timeout: 20000,
+            timeout: 30000,
             maxWait: 5000
         })
 

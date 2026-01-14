@@ -5,15 +5,38 @@ import { revalidatePath } from "next/cache"
 
 // --- Master Data Management ---
 
+export async function getDepartments() {
+    try {
+        const data = await prisma.hRDepartment.findMany({ orderBy: { name: 'asc' } })
+        return { data }
+    } catch (e) {
+        return { error: "Failed to fetch departments" }
+    }
+}
+
 export async function createDepartment(name: string, parentId?: string) {
     try {
         await prisma.hRDepartment.create({
             data: { name, parentId }
         })
-        revalidatePath("/admin/hr")
+        revalidatePath("/admin/hr", "layout")
+        revalidatePath("/admin/hr/employees/new")
+        revalidatePath("/admin/settings")
         return { success: true }
     } catch (e) {
         return { error: "Failed to create department" }
+    }
+}
+
+export async function deleteDepartment(id: string) {
+    try {
+        await prisma.hRDepartment.delete({ where: { id } })
+        revalidatePath("/admin/hr", "layout")
+        revalidatePath("/admin/hr/employees/new")
+        revalidatePath("/admin/settings")
+        return { success: true }
+    } catch (e) {
+        return { error: "Failed to delete department (it may be in use)" }
     }
 }
 
@@ -22,10 +45,24 @@ export async function createDesignation(name: string) {
         await prisma.hRDesignation.create({
             data: { name }
         })
-        revalidatePath("/admin/hr")
+        revalidatePath("/admin/hr", "layout")
+        revalidatePath("/admin/hr/employees/new")
+        revalidatePath("/admin/settings")
         return { success: true }
     } catch (e) {
         return { error: "Failed to create designation" }
+    }
+}
+
+export async function deleteDesignation(id: string) {
+    try {
+        await prisma.hRDesignation.delete({ where: { id } })
+        revalidatePath("/admin/hr", "layout")
+        revalidatePath("/admin/hr/employees/new")
+        revalidatePath("/admin/settings")
+        return { success: true }
+    } catch (e) {
+        return { error: "Failed to delete designation (it may be in use)" }
     }
 }
 
@@ -40,7 +77,9 @@ export async function createShift(data: { name: string, startTime: string, endTi
         }
 
         await prisma.hRShift.create({ data })
-        revalidatePath("/admin/hr")
+        revalidatePath("/admin/hr", "layout")
+        revalidatePath("/admin/hr/employees/new")
+        revalidatePath("/admin/settings")
         return { success: true }
     } catch (e) {
         return { error: "Failed to create shift" }
@@ -98,9 +137,9 @@ export async function createEmployee(data: {
                     lastName: data.lastName,
                     email: data.email,
                     phone: data.phone,
-                    departmentId: data.departmentId,
-                    designationId: data.designationId,
-                    shiftId: data.shiftId,
+                    departmentId: data.departmentId || null,
+                    designationId: data.designationId || null,
+                    shiftId: data.shiftId || null,
                     joinDate: data.joinDate,
                     pan: data.pan,
                     aadhar: data.aadhar,
@@ -137,9 +176,81 @@ export async function createEmployee(data: {
         })
 
         revalidatePath("/admin/hr")
+        revalidatePath("/admin/hr/employees")
         return { success: true }
     } catch (e) {
         return { error: e instanceof Error ? e.message : "Failed to create employee" }
+    }
+}
+
+export async function updateEmployee(id: string, data: {
+    firstName: string
+    lastName: string
+    email: string
+    phone?: string
+    departmentId?: string
+    designationId?: string
+    shiftId?: string
+    joinDate: Date
+    pan?: string
+    aadhar?: string
+    uan?: string
+    pfNumber?: string
+    esiNumber?: string
+    bankName?: string
+    accountNumber?: string
+    ifsc?: string
+}) {
+    try {
+        await prisma.employee.update({
+            where: { id },
+            data: {
+                firstName: data.firstName,
+                lastName: data.lastName,
+                email: data.email,
+                phone: data.phone,
+                departmentId: data.departmentId || null,
+                designationId: data.designationId || null,
+                shiftId: data.shiftId || null,
+                joinDate: data.joinDate,
+                pan: data.pan,
+                aadhar: data.aadhar,
+                uan: data.uan,
+                pfNumber: data.pfNumber,
+                esiNumber: data.esiNumber,
+                bankName: data.bankName,
+                accountNumber: data.accountNumber,
+                ifsc: data.ifsc
+            }
+        })
+        revalidatePath("/admin/hr")
+        revalidatePath("/admin/hr/employees")
+        return { success: true }
+    } catch (e) {
+        return { error: "Failed to update employee" }
+    }
+}
+
+export async function deleteEmployee(id: string) {
+    try {
+        await prisma.employee.delete({ where: { id } })
+        revalidatePath("/admin/hr")
+        revalidatePath("/admin/hr/employees")
+        return { success: true }
+    } catch (e) {
+        return { error: "Failed to delete employee" }
+    }
+}
+
+export async function getEmployee(id: string) {
+    try {
+        const emp = await prisma.employee.findUnique({
+            where: { id },
+            include: { department: true, designation: true }
+        })
+        return { data: emp }
+    } catch (e) {
+        return { error: "Employee not found" }
     }
 }
 

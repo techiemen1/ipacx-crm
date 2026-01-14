@@ -101,7 +101,13 @@ export async function createInventoryItem(data: {
     isSerialTracked?: boolean
 }) {
     try {
-        await prisma.inventoryItem.create({ data })
+        await prisma.inventoryItem.create({
+            data: {
+                ...data,
+                groupId: data.groupId || null,
+                uomId: data.uomId || null
+            }
+        })
         revalidatePath("/admin/inventory/items")
         return { success: true }
     } catch (e) {
